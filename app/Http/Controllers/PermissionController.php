@@ -1,0 +1,132 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Models\Permission;
+
+class PermissionController extends Controller
+{
+    /**
+     * List all permissions, grouped by "group_name" field.
+     */
+    public function index()
+    {
+        $permissions = Permission::orderBy("created_at")
+            ->get(['id', 'name', 'label', 'group_name', "created_at", "updated_at"]);
+    
+        $grouped = [];
+    
+        foreach ($permissions as $perm) {
+            $groupName = $perm->group_name;
+            if (!isset($grouped[$groupName])) {
+                $grouped[$groupName] = [];
+            }
+    
+            $grouped[$groupName][] = [
+                'id'           => $perm->id,
+                'name'         => $perm->name,
+                'label'        => $perm->label,
+                'group_name'   => $perm->group_name,
+                'created_date' => optional($perm->created_at)->format('Y-m-d'),
+                'updated_date' => optional($perm->updated_at)->format('Y-m-d'),
+            ];
+        }
+    
+        return response()->json(["status" => true, "message" => "", "data" => $grouped]);
+    }
+    
+    public function indexPermissionsForFrontAuthintication ()
+    {
+        $userId = Auth::id();
+
+        $user = User::find($userId);
+
+        $permissions = $user->getAllPermissions()->map(function ($p) {
+            return $p->name;
+        });
+
+        return response()->json(["status" => true, "message" => "", "data" => $permissions]);
+    }
+
+    /**
+     * Store a newly created permission.
+     */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|unique:permissions,name',
+            'group' => 'nullable|string',
+        ]);
+
+        $permission = Permission::create($data);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Permission created successfully',
+            'data' => $permission
+        ], 201);
+    }
+
+    /**
+     * Display a single permission
+     */
+    public function show(string $id)
+    {
+        $permission = Permission::find($id);
+
+        if (!$permission) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Permission not found'
+            ], 404);
+        }
+
+        return response()->json($permission);
+    }
+
+    /**
+     * Update a permission
+     */
+    public function update(Request $request, string $id)
+    {
+        $permission = Permission::find($id);
+
+        if (!$permission) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Permission not found'
+            ], 404);
+        }
+
+        $data = $request->validate([
+            'name' => 'required|string|unique:permissions,name,' . $id,
+            'group' => 'nullable|string',
+        ]);
+
+        $permission->update($data);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Permission updated successfully',
+            'data' => $permission
+        ]);
+    }
+
+    /**
+     * Delete a permission
+     */
+    public function destroy(Request $request)
+    {
+        $ids = $request->validate([
+            "ids" => "required|array",
+            "ids.*" => "integer"
+        ]);
+
+        Permission::whereIn("id", $ids)->delete();
+
+        return response()->json(["status" => true, "message" => "Permission successfully deleted !"], 200);
+    }
+}
