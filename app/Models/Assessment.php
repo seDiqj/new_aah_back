@@ -12,6 +12,7 @@ class Assessment extends Model
     protected $fillable = [
         'enact_id',
         'totalScore',
+        'date'
     ];
 
     protected $hidden = [

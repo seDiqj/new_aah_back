@@ -18,33 +18,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable, SoftDeletes, HasRoles, HasApiTokens;
 
 
-    protected $appends = ["created_date", "updated_date"];
-
-    public function getCreatedDateAttribute() {
-
-        return $this->created_at->format("Y-m-d");
-
-    }
-
-    public function getUpdatedDateAttribute() {
-
-        return $this->updated_at->format("Y-m-d");
-        
-    }
-
-    protected function runSoftDelete()
-    {
-        $this->forceFill([
-            $this->getDeletedAtColumn() => $this->freshTimestamp(),
-            "deleted_by" => Auth::id()
-        ]);
-
-        $this->save();
-
-        $this->fireModelEvent("trashed", false);
-    }
-
-    /**
+        /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -74,6 +48,35 @@ class User extends Authenticatable
         'created_at',
         'updated_at'
     ];
+
+
+
+    protected $appends = ["created_date", "updated_date"];
+
+    public function getCreatedDateAttribute() {
+
+        return $this->created_at->format("Y-m-d");
+
+    }
+
+    public function getUpdatedDateAttribute() {
+
+        return $this->updated_at->format("Y-m-d");
+        
+    }
+
+    protected function runSoftDelete()
+    {
+        $this->forceFill([
+            $this->getDeletedAtColumn() => $this->freshTimestamp(),
+            "deleted_by" => Auth::id()
+        ]);
+
+        $this->save();
+
+        $this->fireModelEvent("trashed", false);
+    }
+
 
     /**
      * Get the attributes that should be cast.

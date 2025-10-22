@@ -56,7 +56,6 @@ class Project extends Model
         return $this->hasMany(Program::class);
     }
 
-
     public function provinces()
     {
         return $this->belongsToMany(Province::class);
@@ -85,6 +84,11 @@ class Project extends Model
     public function psychoeducations ()
     {
         return $this->hasManyThrough(Psychoeducations::class, Program::class);
+    }
+
+    public function isp3s ()
+    {
+        
     }
 
 }

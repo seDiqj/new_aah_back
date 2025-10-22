@@ -28,6 +28,22 @@ trait AprToolsTrait
         return $indicators;
     }
 
+    protected function projectIndicatorsWithDessaggregations(Project $project, string $databaseId)
+    {
+
+        $indicators = $project->outcomes->flatMap(function ($outcome) {
+
+            return $outcome->outputs;
+
+        })->flatMap(function ($output) {
+
+            return $output->indicators()->with("dessaggregations")->get();
+            
+        });
+
+        return $indicators;
+    }
+
 
     protected function projectOutputsToASpicificDatabase (Project $project, string $databaseId)
     {

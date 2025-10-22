@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId("enact_id")->constrained("enacts")->cascadeOnDelete();
             $table->float("totalScore");
+            $table->date("date");
             $table->timestamps();
         });
     }

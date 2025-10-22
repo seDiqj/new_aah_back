@@ -126,7 +126,8 @@ class EnactController extends Controller
     {
 
         $enact = Enact::findOrFail($request->enactId);
-        $scores = $request->input('scores'); // ['questionId' => score]
+        $scores = $request->input('scores');
+        $date = $request->input("date");
     
         $questionIds = array_keys($scores);
     
@@ -136,7 +137,8 @@ class EnactController extends Controller
         }
 
         $assessment = $enact->assessments()->create([
-            "totalScore" => 0
+            "totalScore" => 0,
+            "date" => $date
         ]);
 
         $totalScore = 0;

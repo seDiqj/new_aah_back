@@ -222,9 +222,11 @@ Route::prefix("user_mng")->name("user_mng.")->middleware("auth:sanctum")->group(
     Route::get("/users", [UserController::class, "index"]);
     Route::get("/user/me", [UserController::class, "me"]);
     Route::get("/user/{id}", [UserController::class, "show"]);
+    Route::get("/permissionsForAuth/{id}", [UserController::class, "getSystemAndUserPermissions"]);
     Route::post("/user", [UserController::class, "store"]);
     Route::post("/delete_users", [UserController::class, "destroy"]);
-    Route::post("/user/{id}", [UserController::class, "update"]);
+    Route::post("/edit_user/{id}", [UserController::class, "update"]);
+    Route::put("/user/change_password/{id}", [UserController::class, "changeUserPassword"]);
 
     // Role Routes.
     Route::get("/roles", [RoleController::class, "index"]);
@@ -239,6 +241,9 @@ Route::prefix("user_mng")->name("user_mng.")->middleware("auth:sanctum")->group(
     Route::get("/permission/{id}", [PermissionController::class, "show"]);
     Route::post("/permission/delete_permissions", [PermissionController::class, "destroy"]);
     Route::put("/permission/{id}", [PermissionController::class, "update"]);
+
+    // Roles && Permissions
+    Route::get("/permissions_&_roles", [UserController::class, "getAllRolesAndPermissions"]);
 });
 
 // Departments Routes.

@@ -287,6 +287,70 @@ class ProjectsController extends Controller
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in database !"], 404);
 
+        $project["outcomesInfo"] = $project->outcomes;
+
+        unset($project["outcomes"]);
+
+        $project->outcomesInfo->map(function ($outcome) {
+
+            $outcome->outputs->map(function ($output) {
+
+                $output->indicators->map(function ($indicator) {
+
+                    $indicator["provinces"] = Indicator::find($indicator["id"])->provinces;
+                    $indicator["isp3"] = $indicator->isp3;
+
+                    $indicator->provinces->map(function ($province) {
+
+                        $province["province"] = $province["name"];
+                        $province["target"] = $province["pivot"]["target"];
+                        $province["councilorCount"] = $province["pivot"]["councilorCount"];
+
+                        unset(
+                            $province["name"],
+                            $province["id"],
+                            $province["indicator_id"],
+                            $province["councilorCount"]
+                        );
+
+                        return $province;
+
+                    });
+
+                    $indicator->dessaggregations->map(function ($dessaggregation) use ($indicator) {
+
+                        $dessaggregation["dessaggration"] = $dessaggregation["description"];
+                        $dessaggregation["province"] = Province::find($dessaggregation["province_id"])->name;
+                        $dessaggregation["indicatorRef"] = $indicator->indicatorRef;
+                        $dessaggregation["indicatorId"] = $indicator->id;
+
+                        unset(
+                            $dessaggregation["description"],
+                            $dessaggregation["created_at"],
+                            $dessaggregation["updated_at"],
+                            $dessaggregation["description"],
+                            $dessaggregation["province_id"],
+                            $dessaggregation["achived_target"],
+                            $dessaggregation["id"],
+                            $dessaggregation["indicator_id"],
+                            $dessaggregation["months"],
+                        );
+
+                        return $dessaggregation;
+                    });
+
+                    return $indicator;
+
+                });
+
+                return $output;
+
+            });
+
+            return $outcome;
+
+        });
+
         return response()->json(["status" => true, "message" => "", "data" => $project]);
 
     }

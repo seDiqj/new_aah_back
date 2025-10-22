@@ -40,6 +40,8 @@ class AprGeneratorController extends Controller
 
         $projectIndicators = $this->projectIndicatorsToASpicificDatabase($project, $databaseId);
 
+        $projectIndicatorsWithDessaggregations = $this->projectIndicatorsWithDessaggregations($project, $databaseId);
+
         $projectOutputs = $this->projectOutputsToASpicificDatabase($project, $databaseId);
 
         $projectOutcomes = $this->projectOutcomesToASpicificDatabase($project, $databaseId);
@@ -212,28 +214,26 @@ class AprGeneratorController extends Controller
                 ->with('assessments')
                 ->get();
 
-            $numberOfAssessmentsPerMonth = array_fill(0, 12, 0);
+            $numberOfEnactsPerMonth = array_fill(0, 12, 0);
             $scoresPerMonth = array_fill(0, 12, 0);
 
             
             foreach ($projectIndicators as $indicator) {
                 
-                $achieved = $enacts->reduce(function ($carry, $enact) use ($indicator, &$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
+                $achieved = $enacts->reduce(function ($carry, $enact) use ($indicator, &$numberOfEnactsPerMonth, &$scoresPerMonth) {
                     if ($enact->indicator_id == $indicator->id && $enact->aprIncluded)  {
 
-                        $assessments = $enact->assessments;
+                        $monthIndex = (int) Carbon::parse($enact->date)->format("n") - 1;
 
-                        $assessments->map(function ($assessment) use (&$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
+                        $numberOfEnactsPerMonth[$monthIndex]++;
 
-                            $monthIndex = (int) Carbon::parse($assessment->enact->date)->format("n") - 1;
+                        $scoresPerMonth[$monthIndex] += $enact->assessments->reduce(function ($carry, $assessment) {
 
-                            $numberOfAssessmentsPerMonth[$monthIndex]++;
-
-                            $scoresPerMonth[$monthIndex] += $assessment->totalScore;
+                            return $carry + $assessment->totalScore;
 
                         });
 
-                        return $carry + $enact->assessments->count();
+                        return $carry + 1;
                     }
                     return $carry;
                 }, 0);
@@ -248,7 +248,7 @@ class AprGeneratorController extends Controller
 
                 if ($dessaggregations->isEmpty()) continue;
 
-                $dessaggregations->map(function ($dessaggregation) use (&$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
+                $dessaggregations->map(function ($dessaggregation) use (&$numberOfEnactsPerMonth, &$scoresPerMonth) {
 
                     $dessaggregationFromDb = Dessaggregation::where("id", $dessaggregation["id"])->first();
 
@@ -257,7 +257,11 @@ class AprGeneratorController extends Controller
                     switch ($dessaggregation->description) {
                         case '# of supervised psychosocial counsellors':
 
-                            $dessaggregationFromDb->months = $numberOfAssessmentsPerMonth;
+                            $dessaggregationFromDb->months = $numberOfEnactsPerMonth;
+                            $dessaggregationFromDb->achived_target = (collect(...$numberOfEnactsPerMonth))->reduce(function ($carry, $item) {
+                                error_log($item);
+                                return $carry + $item;
+                            }, 0); 
                             $dessaggregationFromDb->save();
 
                             break;
@@ -265,6 +269,9 @@ class AprGeneratorController extends Controller
                         case '# Accumulated score EQUIP (ENACT) Tool':
 
                             $dessaggregationFromDb->months = $scoresPerMonth;
+                            $dessaggregationFromDb->achived_target = collect(...$scoresPerMonth)->reduce(function ($carry, $item) {
+                                return $carry + $item;
+                            });
                             $dessaggregationFromDb->save();
 
                             break;
@@ -339,31 +346,9 @@ class AprGeneratorController extends Controller
 
                             $groupDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)
                                                                             ->where("description", "# 0f group MHPSS consultations")->first();
-
                             $individualDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)->where("description", "# 0f indevidual MHPSS consultations")->first();
 
-                            // if ($groupDessaggregation) {
-
-                            //     $groupSessoins = $ind->sessions->whereNotNull("group")->count();
-
-                            //     $groupDessaggregation->achived_target = $groupSessoins;
-
-                            //     $groupDessaggregation->save();
-
-                            // }
-
-                            // if ($individualDessaggregation) {
-
-                            //     $individualSessions = $ind->sessions->where("group", null)->count();
-
-                            //     $individualDessaggregation->achived_target = $individualSessions;
-
-                            //     $individualDessaggregation->save();
-
-                            // }
-
-                                                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
-
+                            $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
 
                         };
                         return $total;
@@ -428,6 +413,58 @@ class AprGeneratorController extends Controller
             // ], 200);
         }
 
+        $isp3s = $projectIndicatorsWithDessaggregations->flatMap(function ($indicator) {
+            return $indicator->isp3()->with("indicators")->get();
+        });
+
+        $isp3s->map(function ($isp3) {
+            $isp3["isp3"] = $isp3->description;
+
+            unset(
+                $isp3["description"],
+                $isp3["id"],
+                $isp3["pivot"],
+            );
+
+            $isp3->indicators->map(function ($indicator) {
+                unset(
+                    $indicator["created_at"],
+                    $indicator["updated_at"],
+                    $indicator["database_id"],
+                    $indicator["description"],
+                    $indicator["dessaggregationType"],
+                    $indicator["id"],
+                    $indicator["status"],
+                    $indicator["target"],
+                    $indicator["achived_target"],
+                    $indicator["output_id"],
+                    $indicator["pivot"],
+                    $indicator["type_id"],
+                    $indicator["parent_indicator"],
+                );
+
+                $indicator->dessaggregations->map(function ($dessaggregation) {
+
+                    $dessaggregation["name"] = $dessaggregation["description"];
+
+                    unset(
+                        $dessaggregation["achived_target"],
+                        $dessaggregation["created_at"],
+                        $dessaggregation["updated_at"],
+                        $dessaggregation["description"],
+                        $dessaggregation["id"],
+                        $dessaggregation["indicator_id"],
+                        $dessaggregation["province_id"],
+                        $dessaggregation["province_id"],
+                    );
+
+                    return $dessaggregation;
+                });
+
+            
+                return $indicator;
+            });
+        });
 
         $finalAPR = [
             "impact" => $project->projectGoal,
@@ -455,9 +492,9 @@ class AprGeneratorController extends Controller
                     })->toArray(),
                 ];
             })->toArray(),
+            "isp3s" => $isp3s
         ];
         
-
         return response()->json([
             "status" => true,
             "message" => "Indicators updated successfully.",
@@ -532,6 +569,7 @@ class AprGeneratorController extends Controller
      */
     private function updateDessaggregationsFromBeneficiaries(Indicator $indicator, Collection $beneficiaries, Int $provinceId)
     {
+
         $dess = $indicator->dessaggregations()->where('province_id', $provinceId)->get();
         if ($dess->isEmpty()) return;
 

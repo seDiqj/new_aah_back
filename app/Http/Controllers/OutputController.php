@@ -88,4 +88,17 @@ class OutputController extends Controller
         return response()->json(["status" => true, "message" => "Outputs successfully deleted !"], 200);
 
     }
+
+    public function destroyOutput(string $id) {
+
+        $output = Output::find($id);
+
+        if (!$output) return response()->json(["status" => false, "message" => "No such output in system !"], 404);
+
+
+        $output->delete();
+
+        return response()->json(["status" => false, "message" => "Output successfully deleted !"], 200);
+
+    }
 }

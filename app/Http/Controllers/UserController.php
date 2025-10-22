@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -25,11 +26,12 @@ class UserController extends Controller
 
     public function store(ValidateUserRequest $request)
     {
+
         $data = $request->validated();
 
         $data['password'] = Hash::make($data['password']);
 
-        $department = Department::where('name', $data['department'])->first();
+        $department = Department::find($data['department']);
         if (!$department) {
             return response()->json([
                 'status' => false,
@@ -103,8 +105,6 @@ class UserController extends Controller
         ], 200);
     }
 
-
-
     public function update(Request $request, $id)
     {
 
@@ -114,11 +114,14 @@ class UserController extends Controller
             "name" => "required|string|min:3",
             "title" => "nullable|string",
             "email" => "nullable|email",
+            "password" => "nullable|string|min:6",
             "status" => "nullable|in:active,inactive",
             "department" => "nullable|string",
             "role" => "nullable|string",
+            "permissions" => "nullable|string",
             "photo_path" => "nullable|image|max:2048",
         ]);
+
 
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -228,4 +231,95 @@ class UserController extends Controller
             ]
         ], 200);
     }
+
+    public function changeUserPassword(Request $request, $id)
+    {
+        $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = User::findOrFail($id);
+
+        $user->password = Hash::make($request->input('password'));
+        $user->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Password changed successfully!',
+        ]);
+    }
+
+    public function getSystemAndUserPermissions(string $id) 
+    {
+        $systemPermissions = Permission::all()->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'label' => $p->label,
+                'group_name' => $p->group_name ?? null,
+            ];
+        });
+
+        // group the permissions via group_name
+        $groupedPermissions = $systemPermissions->groupBy('group_name')->map(function ($group) {
+            return $group->values();
+        })->values();
+
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such user in database!"
+            ], 404);    
+        }
+
+        $userPermissions = $user->getAllPermissions()->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'label' => $p->label,
+                'group_name' => $p->group_name ?? null,
+            ];
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "Permissions retrieved successfully",
+            "data" => [
+                'system_permissions' => $groupedPermissions,
+                'user_permissions' => $userPermissions,
+            ]
+        ], 200);
+    }
+
+    public function getAllRolesAndPermissions()
+    {
+        $systemPermissions = Permission::all()->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'label' => $p->label,
+                'group_name' => $p->group_name ?? null,
+            ];
+        });
+
+        $groupedPermissions = $systemPermissions->groupBy('group_name')->map(function ($group) {
+            return $group->values();
+        });
+
+        $systemRoles = Role::with("permissions")->get();
+
+        $finalData = [
+            "permissions" => $groupedPermissions,
+            "roles" => $systemRoles
+        ];
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $finalData
+        ], 200);
+    }
+
 }

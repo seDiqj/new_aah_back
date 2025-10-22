@@ -27,8 +27,8 @@ class ValidateUserRequest extends FormRequest
             'email'             => 'required|email|unique:users,email',
             'password'          => 'required|string|min:8',
             'email_verified_at' => 'nullable|date',
-            'photo_path'        => 'nullable|image|max:2048',
-            'department'        => 'nullable|string|exists:departments,name',
+            'photo_path'        => 'nullable|image|max:1000',
+            'department'        => 'nullable|string|exists:departments,id',
             'status'            => 'required|in:active,inactive',
             'role'              => 'required|string|exists:roles,name'
         ];

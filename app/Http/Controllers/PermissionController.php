@@ -28,10 +28,6 @@ class PermissionController extends Controller
             $grouped[$groupName][] = [
                 'id'           => $perm->id,
                 'name'         => $perm->name,
-                'label'        => $perm->label,
-                'group_name'   => $perm->group_name,
-                'created_date' => optional($perm->created_at)->format('Y-m-d'),
-                'updated_date' => optional($perm->updated_at)->format('Y-m-d'),
             ];
         }
     
