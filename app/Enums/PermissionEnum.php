@@ -82,7 +82,7 @@ enum PermissionEnum: string
     case REFERRAL_EXPORT = 'Export.referral excel report';
 
     // ===================== Database Management =====================
-    case DATABASE_CREATE = 'Database_submission .create';
+    case DATABASE_CREATE = 'Database_submission.create';
     case DATABASE_VIEW = 'Dabase_submission.view';
     case DATABASE_EDIT = 'Database_submission.edit';
     case DATABASE_DELETE = 'Database_submission.delete';

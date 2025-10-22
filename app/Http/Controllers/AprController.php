@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 use App\Models\Apr;
+use App\Models\Project;
 
 class AprController extends Controller
 {
@@ -34,6 +35,22 @@ class AprController extends Controller
         $instance = new AprGeneratorController();
 
         return $instance->showSpicificDatabaseApr($apr->project_id, $apr->database_id, $apr->province_id, $apr->fromDate, $apr->toDate);
+
+    }
+
+    public function getSystemAprsStatus ()
+    {
+
+        $aprs = Apr::all();
+
+        $numberOfAprsWithSpicificStatus = $aprs->map(function ($item) {
+            return $item->status;
+        })->countBy();
+        
+        $projectsCount = Project::all()->count();
+
+
+        return response()->json(["status" => true, "data" => $numberOfAprsWithSpicificStatus], 200); 
 
     }
 

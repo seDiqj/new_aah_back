@@ -15,7 +15,7 @@ class PermissionController extends Controller
     public function index()
     {
         $permissions = Permission::orderBy("created_at")
-            ->get(['id', 'name', 'label', 'group_name', "created_at", "updated_at"]);
+            ->get(['id', 'name', 'label', 'group_name']);
     
         $grouped = [];
     
@@ -32,6 +32,14 @@ class PermissionController extends Controller
         }
     
         return response()->json(["status" => true, "message" => "", "data" => $grouped]);
+    }
+
+    public function indexPermissions()
+    {
+        $permissions = Permission::orderBy("created_at")
+            ->get(['id', 'name', 'label', 'group_name']);
+    
+        return response()->json(["status" => true, "message" => "", "data" => $permissions]);
     }
     
     public function indexPermissionsForFrontAuthintication ()
