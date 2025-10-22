@@ -118,8 +118,8 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
     Route::get("/program/{id}", [MainDatabaseController::class, "showBeneficiaryProgram"])->middleware("permission:Maindatabase.view");
     Route::get("/indicators/{id}", [MainDatabaseController::class, "indexIndicators"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary", [MainDatabaseController::class, "storeBeneficiary"])->middleware("permission:Maindatabase.create");
-    Route::post("/beneficiary/mealtools/{id}", [MainDatabaseController::class, "storeMealtool"])->middleware("Maindatabase.create");
-    Route::post("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "storeBeneficiaryEvaluation"])->middleware("Maindatabase.create");
+    Route::post("/beneficiary/mealtools/{id}", [MainDatabaseController::class, "storeMealtool"])->middleware("permission:Maindatabase.create");
+    Route::post("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "storeBeneficiaryEvaluation"])->middleware("permission:Maindatabase.create");
     Route::post("/reffer_beneficiary/{id}", [MainDatabaseController::class, "refferBeneficiary"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary/add_to_kit_list/{id}", [MainDatabaseController::class, "addBeneficiaryToKitList"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary/includeOrExcludeBeneficiaryToOrFromAPR/{newState}", [MainDatabaseController::class, "includeOrExcludeBeneficiaryToOrFromAPR"])->middleware("permission:Maindatabase.view");
@@ -136,19 +136,19 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
 
 // permissions done
 Route::prefix("kit_db")->name("kit_db.")->middleware(["auth:sanctum"])->group(function () {
-    Route::get("/beneficiaries", [KitDatabaseController::class, "indexBeneficiaries"])->middleware("permissoin:Kit.view");
-    Route::get("/bnf_kits/{id}", [KitDatabaseController::class, "indexBeneficiaryKitList"])->middleware("permissoin:Kit.view");
-    Route::get("/kit_list", [KitDatabaseController::class, "indexKitList"])->middleware("permissoin:Kit.view");
-    Route::get("/beneficiary/{id}", [KitDatabaseController::class, "showBeneficiary"])->middleware("permissoin:Kit.view");
-    Route::get("/program/{id}", [KitDatabaseController::class, "showBeneficiaryProgram"])->middleware("permissoin:Kit.view");
-    Route::get("/show_kit/{id}", [KitDatabaseController::class, "showKit"])->middleware("permissoin:Kit.view");
+    Route::get("/beneficiaries", [KitDatabaseController::class, "indexBeneficiaries"])->middleware("permission:Kit.view");
+    Route::get("/bnf_kits/{id}", [KitDatabaseController::class, "indexBeneficiaryKitList"])->middleware("permission:Kit.view");
+    Route::get("/kit_list", [KitDatabaseController::class, "indexKitList"])->middleware("permission:Kit.view");
+    Route::get("/beneficiary/{id}", [KitDatabaseController::class, "showBeneficiary"])->middleware("permission:Kit.view");
+    Route::get("/program/{id}", [KitDatabaseController::class, "showBeneficiaryProgram"])->middleware("permission:Kit.view");
+    Route::get("/show_kit/{id}", [KitDatabaseController::class, "showKit"])->middleware("permission:Kit.view");
     Route::post("/beneficiary", [KitDatabaseController::class, "storeBeneficiary"]);
-    Route::post("/kit", [KitDatabaseController::class, "storeKit"])->middleware("permissoin:Kit.create");
-    Route::post("/add_kit_to_bnf/{id}", [KitDatabaseController::class, "addNewKitToBeneficiary"])->middleware("permissoin:Kit.create");
-    Route::put("/beneficiary/{id}", [KitDatabaseController::class, "updateBeneficiary"])->middleware("permissoin:Kit.edit");
-    Route::put("/kit/{id}", [MainDatabaseController::class, "updateKit"])->middleware("permissoin:Kit.edit");
-    Route::post("/delete_beneficiaries", [KitDatabaseController::class, "destroyBeneficiary"])->middleware("permissoin:Kit.delete");
-    Route::delete("/kit/{id}", [KitDatabaseController::class, "destroyKit"])->middleware("permissoin:Kit.delete");
+    Route::post("/kit", [KitDatabaseController::class, "storeKit"])->middleware("permission:Kit.create");
+    Route::post("/add_kit_to_bnf/{id}", [KitDatabaseController::class, "addNewKitToBeneficiary"])->middleware("permission:Kit.create");
+    Route::put("/beneficiary/{id}", [KitDatabaseController::class, "updateBeneficiary"])->middleware("permission:Kit.edit");
+    Route::put("/kit/{id}", [MainDatabaseController::class, "updateKit"])->middleware("permission:Kit.edit");
+    Route::post("/delete_beneficiaries", [KitDatabaseController::class, "destroyBeneficiary"])->middleware("permission:Kit.delete");
+    Route::delete("/kit/{id}", [KitDatabaseController::class, "destroyKit"])->middleware("permission:Kit.delete");
 });
 
 // permissions done need full review
