@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Helpers\LogHelpers;
 
 class IndicatorController extends Controller
 {
@@ -194,7 +195,6 @@ class IndicatorController extends Controller
             ], 404);
         }
 
-        // 🔹 پیدا کردن Output و Database
         $output = Output::where("outputRef", $request->input("outputRef", $indicator->output->outputRef))->first();
         if (!$output) {
             return response()->json(["status" => false, "message" => "Invalid output ref!"], 404);
@@ -205,7 +205,6 @@ class IndicatorController extends Controller
             return response()->json(["status" => false, "message" => "Invalid database!"], 404);
         }
 
-        // 🔹 آپدیت اندیکیتور اصلی
         $indicator->update([
             'output_id' => $output->id,
             'database_id' => $database->id,
@@ -218,7 +217,6 @@ class IndicatorController extends Controller
             'description' => $request->input('description', $indicator->description),
         ]);
 
-        // 🔹 آپدیت provinces (در جدول pivot)
         $provincesDetails = $request->input("provinces", []);
         if (is_array($provincesDetails) && count($provincesDetails) > 0) {
             $provincesNames = collect($provincesDetails)->pluck('province')->toArray();
@@ -227,11 +225,10 @@ class IndicatorController extends Controller
 
             $finalProvincesData = [];
             foreach ($provincesDetails as $provinceData) {
-                $provinceName = strtolower($provinceData["province"]);
+                $provinceName = $provinceData["province"];
                 if (!isset($provincesIds[$provinceName])) continue;
                 $finalProvincesData[$provincesIds[$provinceName]] = [
                     "target" => $provinceData["target"],
-                    "achived_target" => $provinceData["achived_target"] ?? 0,
                     "councilorCount" => $provinceData["councilorCount"] ?? 0,
                 ];
             }
@@ -239,8 +236,7 @@ class IndicatorController extends Controller
             $indicator->provinces()->sync($finalProvincesData);
         }
 
-        // 🔹 آپدیت subIndicator در صورت وجود
-        if ($request->has('subIndicator')) {
+        if ($request->has('subIndicator') && $request->input("subIndicator") != null) {
             $sub = $request->input('subIndicator');
 
             $subIndicator = Indicator::firstOrNew([

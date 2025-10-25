@@ -50,28 +50,20 @@ class OutputController extends Controller
 
     }
 
-    public function update(StoreOutputRequest $request, Output $output)
+    public function update(Request $request, string $id)
     {
-        $validated = $request->validated();
+        $output = Output::find($id);
 
-        $correspondingOutcome = Outcome::where('outcomeRef', $validated['outcomeRef'])->first();
+        if (!$output) return response()->json(["status" => false, "message" => "No such output in database !"], 404);
 
-        if (!$correspondingOutcome) {
-            return response()->json([
-                "status" => false,
-                "message" => "The output with name " . $validated["output"] . " has no valid outcome reference"
-            ], 422);
-        }
-
-        $validated['outcome_id'] = $correspondingOutcome->id;
+        $validated = $request->validate([
+            "output" => "required|string",
+            "outputRef" => "required|string"
+        ]);
 
         $output->update($validated);
 
-        return response()->json([
-            "status" => true,
-            "message" => "Output updated successfully",
-            "data" => $output
-        ]);
+        return response()->json(["status" => true, "message" => "Output updated successfully !"]);
     }
 
     public function destroy(Request $request) {

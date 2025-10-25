@@ -74,11 +74,12 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     Route::get("/projects_for_submition", [ProjectsController::class, "indexProjectsForSubmitting"]);
     Route::get("/project_databases_&_provinces/{id}", [ProjectsController::class, "indexProjectNecessaryDataForSubmition"]);
     Route::get("/provinces/{id}", [ProjectsController::class, "indexProjectProvinces"]);
-    Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permissoin:Project.create");
+    Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
+    Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
+    Route::post("/{id}", [ProjectsController::class, "updateProject"]);
     Route::post("/delete_projects", [ProjectsController::class, "destroyProject"])->middleware("permission:Project.delete");
     Route::post("/submit_new", [ProjectsController::class, "submitNewDatabase"]);
     Route::post("/status/change_apr_status/{id}", [ProjectsController::class, "changeAprStatus"]);
-    Route::put("/{id}", [ProjectsController::class, "updateProjectFull"]);
 
     // Outcomes Routes.
     Route::get("/outcomes/{id}", [ProjectsController::class, "index"]);
@@ -89,7 +90,7 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     // Outputs Routes.
     Route::get("/outputs/{id}", [ProjectsController::class, "indexProjectOutputs"]);
     Route::post("/output", [OutputController::class, "store"]);
-    Route::put("/output/{id}", [OutputController::class, "updateOutput"]);
+    Route::put("/output/{id}", [OutputController::class, "update"]);
     Route::delete("/output/{id}", [OutputController::class, "destroyOutput"]);
 
     // Indecators / Activities Routes.
@@ -104,6 +105,7 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     // Dessagregations Routes.
     Route::get("/disaggregations/{id}", [DessaggregationController::class, "indexProjectDisaggregations"]);
     Route::post("/disaggregation", [DessaggregationController::class, "store"]);
+    Route::put("/dissaggregation", [DessaggregationController::class, "update"]);
     Route::delete("/disaggregation/{id}", [DessaggregationController::class, "destroy"]);
 });
 

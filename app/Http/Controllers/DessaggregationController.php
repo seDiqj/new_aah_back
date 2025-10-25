@@ -67,48 +67,41 @@ class DessaggregationController extends Controller
     {
         $dessaggregations = $request->input("dessaggregations");
 
+        \Log::info($dessaggregations);
+
         foreach ($dessaggregations as $dessaggregation) 
         {
-            $corespondingIndicator = Indicator::where("indicatorRef", $dessaggregation["indicatorRef"])->first();
-
-            if (!$corespondingIndicator) {
+            $indicator = Indicator::find($dessaggregation["indicatorId"]);
+            if (!$indicator) {
                 return response()->json([
                     "status" => false,
-                    "message" => "Invalid indicator reference for dessaggregation " . $dessaggregation["dessaggregation"]
+                    "message" => "Invalid indicator reference for dessaggregation " . $dessaggregation["dessaggration"]
                 ], 422);
             }
 
             $province = Province::where("name", $dessaggregation["province"])->first();
-
             if (!$province) {
                 return response()->json([
                     "status" => false,
-                    "message" => "Invalid province for dessaggregation " . $dessaggregation["dessaggregation"]
+                    "message" => "Invalid province for dessaggregation " . $dessaggregation["dessaggration"]
                 ], 422);
             }
 
             $data = [
-                "indicator_id" => $corespondingIndicator->id,
-                "province_id" => $province->id,
+                "target" => $dessaggregation["target"] ?? 0,
                 "achived_target" => $dessaggregation["achived_target"] ?? 0,
-                "target" => $dessaggregation["target"] ?? null, 
+                "councilorCount" => $dessaggregation["councilorCount"] ?? 0,
+                "description" => $dessaggregation["dessaggration"],
             ];
 
-            unset($dessaggregation["indicatorRef"]);
-            unset($dessaggregation["province"]);
-            unset($dessaggregation["achived_target"]);
-            unset($dessaggregation["target"]);
-
-            $existing = Dessaggregation::where([
-                "indicator_id" => $corespondingIndicator->id,
-                "province_id" => $province->id
-            ])->first();
-
-            if ($existing) {
-                $existing->update($data);
-            } else {
-                Dessaggregation::create($data);
-            }
+            Dessaggregation::updateOrCreate(
+                [
+                    "indicator_id" => $indicator->id,
+                    "province_id" => $province->id,
+                    "description" => $dessaggregation["dessaggration"]
+                ],
+                $data
+            );
         }
 
         return response()->json([
@@ -116,5 +109,62 @@ class DessaggregationController extends Controller
             "message" => "Dessaggregations successfully updated!"
         ], 200);
     }
+
+
+
+    // public function update(Request $request)
+    // {
+    //     $dessaggregations = $request->input("dessaggregations");
+
+    //     foreach ($dessaggregations as $dessaggregation) 
+    //     {
+    //         $corespondingIndicator = Indicator::where("indicatorRef", $dessaggregation["indicatorRef"])->first();
+
+    //         if (!$corespondingIndicator) {
+    //             return response()->json([
+    //                 "status" => false,
+    //                 "message" => "Invalid indicator reference for dessaggregation " . $dessaggregation["dessaggregation"]
+    //             ], 422);
+    //         }
+
+    //         $province = Province::where("name", $dessaggregation["province"])->first();
+
+    //         if (!$province) {
+    //             return response()->json([
+    //                 "status" => false,
+    //                 "message" => "Invalid province for dessaggregation " . $dessaggregation["dessaggregation"]
+    //             ], 422);
+    //         }
+
+    //         $data = [
+    //             "indicator_id" => $corespondingIndicator->id,
+    //             "province_id" => $province->id,
+    //             "achived_target" => $dessaggregation["achived_target"] ?? 0,
+    //             "target" => $dessaggregation["target"] ?? null, 
+    //         ];
+
+    //         unset($dessaggregation["indicatorRef"]);
+    //         unset($dessaggregation["province"]);
+    //         unset($dessaggregation["achived_target"]);
+    //         unset($dessaggregation["target"]);
+
+    //         $existing = Dessaggregation::where([
+    //             "indicator_id" => $corespondingIndicator->id,
+    //             "province_id" => $province->id,
+    //             "description" => $dessaggregation["dessaggregation"],
+    //         ])->first();
+
+    //         if ($existing) {
+    //             $existing->update($data);
+    //         } else {
+    //             Dessaggregation::create($data);
+    //         }
+    //     }
+
+    //     return response()->json([
+    //         "status" => true,
+    //         "message" => "Dessaggregations successfully updated!"
+    //     ], 200);
+    // }
 
 }

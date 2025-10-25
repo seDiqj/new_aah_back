@@ -299,8 +299,11 @@ class ProjectsController extends Controller
 
                     $indicator["provinces"] = Indicator::find($indicator["id"])->provinces;
                     $indicator["isp3"] = $indicator->isp3;
+                    $indicator["database"] = Database::find($indicator["database_id"])->name;
 
-                    $indicator->provinces->map(function ($province) {
+                    unset($indicator["database_id"]);
+
+                    $indicator["provinces"] = $indicator->provinces->map(function ($province) {
 
                         $province["province"] = $province["name"];
                         $province["target"] = $province["pivot"]["target"];
@@ -310,7 +313,6 @@ class ProjectsController extends Controller
                             $province["name"],
                             $province["id"],
                             $province["indicator_id"],
-                            $province["councilorCount"]
                         );
 
                         return $province;
@@ -332,7 +334,7 @@ class ProjectsController extends Controller
                             $dessaggregation["province_id"],
                             $dessaggregation["achived_target"],
                             $dessaggregation["id"],
-                            $dessaggregation["indicator_id"],
+                            // $dessaggregation["indicator_id"],
                             $dessaggregation["months"],
                         );
 
@@ -362,7 +364,7 @@ class ProjectsController extends Controller
         if (!$project) return response()->json(["status" => false, "message" => "No such project in database !"], 404);
 
         $validated = $request->validate([
-            'projectCode'      => ['required', 'string', 'max:255', Rule::unique('projects', 'projectCode')->ignore($project->id)],
+            'projectCode'      => ['required', 'string', 'max:255'],
             'projectTitle'     => 'required|string|max:255',
             'projectGoal'      => 'required|string|max:255',
             'projectDonor'     => 'required|string|max:255',
@@ -388,7 +390,6 @@ class ProjectsController extends Controller
             return response()->json(["status" => false, "message" => "No such project in database!"], 404);
         }
 
-        // 1️⃣ Validate main project data
         $validatedProject = $request->validate([
             'projectCode'      => ['required', 'string', 'max:255', Rule::unique('projects', 'projectCode')->ignore($project->id)],
             'projectTitle'     => 'required|string|max:255',

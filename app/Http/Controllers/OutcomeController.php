@@ -51,25 +51,21 @@ class OutcomeController extends Controller
 
     }
     
-    public function updateOutcomes(Request $request, $id)
+    public function update(Request $request, $id)
     {
-        $project = Project::find($id);
-        if (!$project) return response()->json(['status' => false, 'message' => 'Project not found'], 404);
 
-        $request->validate([
-            'outcomes' => 'required|array',
-            'outcomes.*.outcome' => 'required|string',
-            'outcomes.*.outcomeRef' => 'required|string',
+        $outcome = Outcome::find($id);
+
+        if (!$outcome) return response()->json(["status" => false, "message" => "No such outcome in database !"], 404);
+
+        $validated = $request->validate([
+            'outcome' => 'required|string',
+            'outcomeRef' => 'required|string'
         ]);
 
-        foreach ($request->outcomes as $outcomeData) {
-            Outcome::updateOrCreate(
-                ['project_id' => $project->id, 'outcomeRef' => $outcomeData['outcomeRef']],
-                ['outcome' => $outcomeData['outcome']]
-            );
-        }
-
-        return response()->json(['status' => true, 'message' => 'Outcomes updated successfully']);
+        $outcome->update($validated);
+        
+        return response()->json(['status' => true, 'message' => 'Outcome updated successfully']);
     }
 
 
