@@ -62,7 +62,7 @@ enum PermissionEnum: string
     case DIALOGUE_VIEW = 'Dialogue.view';
     case DIALOGUE_EDIT = 'Dialogue.edit';
     case DIALOGUE_DELETE = 'Dialogue.delete';
-    case DIALOGUE_ASSIGN = 'Dialogue.assign_community_dailogue';
+    case DIALOGUE_ASSIGN = 'Dialogue.assign';
     case DIALOGUE_CREATE_BENEFICIARY = 'Dialogue.create_beneficiary';
     case COMMUNITY_DIALOGUE_DOWNLOAD = 'Community_dailogue.download_excel_report';
 
@@ -83,11 +83,11 @@ enum PermissionEnum: string
 
     // ===================== Database Management =====================
     case DATABASE_CREATE = 'Database_submission.create';
-    case DATABASE_VIEW = 'Dabase_submission.view';
+    case DATABASE_VIEW = 'Database_submission.view';
     case DATABASE_EDIT = 'Database_submission.edit';
     case DATABASE_DELETE = 'Database_submission.delete';
     case DATABASE_APPROVE = 'Database_submission.approve';
-    case DATABASE_GENERATE_APR = 'Datbase_submission.generate_apr';
+    case DATABASE_GENERATE_APR = 'Database_submission.generate_apr';
     case DATABASE_DOWNLOAD = 'Database_submission.download';
 
     // ===================== APR Management =====================

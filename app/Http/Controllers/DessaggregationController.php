@@ -67,8 +67,6 @@ class DessaggregationController extends Controller
     {
         $dessaggregations = $request->input("dessaggregations");
 
-        \Log::info($dessaggregations);
-
         foreach ($dessaggregations as $dessaggregation) 
         {
             $indicator = Indicator::find($dessaggregation["indicatorId"]);
@@ -104,13 +102,13 @@ class DessaggregationController extends Controller
             );
         }
 
+        
+
         return response()->json([
             "status" => true,
             "message" => "Dessaggregations successfully updated!"
         ], 200);
     }
-
-
 
     // public function update(Request $request)
     // {

@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string("incentiveAmount")->nullable();
             $table->string("participantOrganization")->nullable();
             $table->string("email")->nullable();
+            $table->boolean("refferedForKit")->nullable()->default(false);
             $table->timestamps();
         });
     }

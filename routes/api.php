@@ -23,6 +23,7 @@ use App\Http\Controllers\ReferralDatabaseController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Isp3Controller;
 use App\Models\Enact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -63,6 +64,9 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
     // Indicators routes.
     Route::get("/indicators/{databaseName}", [GlobalController::class, "indexDatabaseIndicators"]);
 
+    // Beneficiary
+    Route::post("/beneficiary/change_apr_included/{id}", [GlobalController::class, "changeBeneficiaryAprIncluded"]);
+
 });
 
 Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->group(function () {
@@ -74,6 +78,7 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     Route::get("/projects_for_submition", [ProjectsController::class, "indexProjectsForSubmitting"]);
     Route::get("/project_databases_&_provinces/{id}", [ProjectsController::class, "indexProjectNecessaryDataForSubmition"]);
     Route::get("/provinces/{id}", [ProjectsController::class, "indexProjectProvinces"]);
+    Route::get("/get_project_finalizers_details/{id}", [ProjectsController::class, "getProjectFinalizersDetails"]);
     Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
     Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
     Route::post("/{id}", [ProjectsController::class, "updateProject"]);
@@ -83,13 +88,13 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
 
     // Outcomes Routes.
     Route::get("/outcomes/{id}", [ProjectsController::class, "index"]);
-    Route::post("/outcome", [OutcomeController::class, "store"]);
+    Route::post("/o/outcome", [OutcomeController::class, "store"]);
     Route::put("/outcome/{id}", [OutcomeController::class, "update"]);
     Route::delete("/outcome/{id}", [OutcomeController::class, "destroy"]);
 
     // Outputs Routes.
     Route::get("/outputs/{id}", [ProjectsController::class, "indexProjectOutputs"]);
-    Route::post("/output", [OutputController::class, "store"]);
+    Route::post("/o/output", [OutputController::class, "store"]);
     Route::put("/output/{id}", [OutputController::class, "update"]);
     Route::delete("/output/{id}", [OutputController::class, "destroyOutput"]);
 
@@ -97,16 +102,19 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     Route::get("/indicators/{id}", [ProjectsController::class, "indexProjectIndicators"]);
     Route::get("/indicators/{databaseName}/{id}", [ProjectsController::class, "indixProjectSpicificDatabaseIndicator"]);
     Route::get("/indicator/{id}", [IndicatorController::class, "showIndicator"]);
-    Route::post("/indicator", [IndicatorController::class, "store"]);
+    Route::post("/i/indicator", [IndicatorController::class, "store"]);
     Route::put("/indicator/{id}", [IndicatorController::class, "update"]);
     Route::put("/indicator/change_status/{id}", [IndicatorController::class, "changeIndicatorStatus"]);
     Route::delete("/indicator/{id}", [IndicatorController::class, "destroy"]);
 
     // Dessagregations Routes.
     Route::get("/disaggregations/{id}", [DessaggregationController::class, "indexProjectDisaggregations"]);
-    Route::post("/disaggregation", [DessaggregationController::class, "store"]);
+    Route::post("/d/disaggregation", [DessaggregationController::class, "store"]);
     Route::put("/dissaggregation", [DessaggregationController::class, "update"]);
     Route::delete("/disaggregation/{id}", [DessaggregationController::class, "destroy"]);
+
+    // isp3
+    Route::post("/is/isp3", [Isp3Controller::class, "store"]);
 });
 
 // permissions done
@@ -158,15 +166,20 @@ Route::prefix("community_dialogue_db")->name("community_dialogue_db.")->middlewa
     Route::get("/beneficiaries", [CommunityDialogueDatabaseController::class, "indexBeneficiaries"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogues", [CommunityDialogueDatabaseController::class, "indexCommunityDialogues"])->middleware("permission:Dialogue.view");
     Route::get("/beneficiary/sessions/{id}", [CommunityDialogueDatabaseController::class, "indexBeneficirySessions"])->middleware("permission:Dialogue.view");
+    Route::get("/community_dialogue_for_edit/{id}", [CommunityDialogueDatabaseController::class, "showCommunityDialogue"]);
     Route::get("/beneficiary/{id}", [CommunityDialogueDatabaseController::class, "showBeneficiary"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogues/for_selection", [CommunityDialogueDatabaseController::class, "indexCommunityDialoguesForSelection"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogue/sessions/{id}", [CommunityDialogueDatabaseController::class, "indexCdSessions"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogue/groups/beneficiaries/{id}", [CommunityDialogueDatabaseController::class, "indexCommunityDialogueGroupBeneficiaries"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "showCD"])->middleware("permission:Dialogue.view");
+    Route::get("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "showSession"])->middleware("permission:Dialogue.view");
     Route::post("/beneficiary", [CommunityDialogueDatabaseController::class, "storeBeneficiary"])->middleware("permission:Dialogue.create_beneficiary");
     Route::post("/community_dialogue", [CommunityDialogueDatabaseController::class, "storeCommunityDialogue"])->middleware("permission:Dialogue.create");
+    Route::post("/community_dialogue/session", [CommunityDialogueDatabaseController::class, "createNewSession"])->middleware("permission:Dialogue.create");
     Route::post("/beneficiaries/add_community_dialogue", [CommunityDialogueDatabaseController::class, "addCommunityDialogueToBeneficiaries"])->middleware("permission:Dialogue.assign_community_dailogue");
     Route::put("/beneficiary/{id}", [CommunityDialogueDatabaseController::class, "updateBeneficiary"])->middleware("permission:Dialogue.edit");
+    Route::put("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "updateCommunityDialogue"])->middleware("permission:Dialogue.edit");
+    Route::put("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "updateSession"])->middleware("permission:Dialogue.edit");
     Route::post("/delete_beneficiary_sessions/{id}", [CommunityDialogueDatabaseController::class, "destroyBeneficiarySessions"])->middleware("permission:Dialogue.delete");
     Route::post("/delete_cds", [CommunityDialogueDatabaseController::class, "destroyCommunityDialogues"])->middleware("permission:Dialogue.delete");
     Route::post("/community_dialogue_db/community_dialogue/sessions/delete_sessions", [CommunityDialogueDatabaseController::class, "destroySessions"])->middleware("permission:Dialogue.delete");
@@ -263,13 +276,13 @@ Route::prefix("departments")->name("departments.")->middleware(["auth"])->group(
 
 // permission done needs full review
 Route::prefix("db_management")->name("db_management.")->middleware("auth:sanctum")->group(function () {
-    Route::get("/submitted_databases", [DatabaseController::class, "indexSubmittedDatabases"])->middleware("permission:Dabase_submission.view");
-    Route::get("/first_approved_databases", [DatabaseController::class, "indexFirstApprovedDatabases"])->middleware("permission:Dabase_submission.view");
-    Route::get("/show_database/{id}", [DatabaseController::class, "showSubmittedDatabase"])->middleware("permission:Dabase_submission.view");
-    Route::post("/change_db_status/{id}", [DatabaseController::class, "changeDatabaseStatus"])->middleware("permission:Dabase_submission.view");
-    Route::post("/submit_new_database", [DatabaseController::class, "submitNewDatabase"])->middleware("permission:Dabase_submission.create");
-    Route::post("/deleted_submitted_databases", [DatabaseController::class, "destroySubmittedDatabases"])->middleware("permission:Dabase_submission.delete");
-    Route::post("/deleted_first_approved_databases", [DatabaseController::class, "destroyFirstApprovedDatabases"])->middleware("permission:Dabase_submission.delete");
+    Route::get("/submitted_databases", [DatabaseController::class, "indexSubmittedDatabases"])->middleware("permission:Database_submission.view");
+    Route::get("/first_approved_databases", [DatabaseController::class, "indexFirstApprovedDatabases"])->middleware("permission:Database_submission.view");
+    Route::get("/show_database/{id}", [DatabaseController::class, "showSubmittedDatabase"])->middleware("permission:Database_submission.view");
+    Route::post("/change_db_status/{id}", [DatabaseController::class, "changeDatabaseStatus"])->middleware("permission:Database_submission.view");
+    Route::post("/submit_new_database", [DatabaseController::class, "submitNewDatabase"])->middleware("permission:Database_submission.create");
+    Route::post("/deleted_submitted_databases", [DatabaseController::class, "destroySubmittedDatabases"])->middleware("permission:Database_submission.delete");
+    Route::post("/deleted_first_approved_databases", [DatabaseController::class, "destroyFirstApprovedDatabases"])->middleware("permission:Database_submission.delete");
 });
 
 // permission done needs full review

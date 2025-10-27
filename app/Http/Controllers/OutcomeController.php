@@ -31,7 +31,6 @@ class OutcomeController extends Controller
     
     public function store(StoreOutcomeRequest $request)
     {
-
         $validated = $request->validated();
 
         $projectId = $request["project_id"];

@@ -6,10 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Isp3 extends Model
 {
-    protected $fillable = [
-        "indicator_id",
-        "isp3_id"
-    ];
 
     protected $hidden = [
         "created_at",

@@ -66,20 +66,24 @@ class RolePermissionSeeder extends Seeder
             "Psychoeducation.delete" => "Myspace Psychoeducation",
             "Psychoeducation.download_excel_report" => "Myspace Psychoeducation",
             "Dialogue.create" => "Myspace Community Dialogue",
+            'Dialogue.create_beneficiary' => "Myspace Community Dialogue",
             "Dialogue.view" => "Myspace Community Dialogue",
             "Dialogue.edit" => "Myspace Community Dialogue",
             "Dialogue.delete" => "Myspace Community Dialogue",
             "Dialogue.assign" => "Myspace Community Dialogue",
+            'Community_dailogue.download_excel_report' => "Myspace Community Dialogue",
             "Training.create" => "Myspace Training Sessions",
             "Training.view" => "Myspace Training Sessions",
             "Training.edit" => "Myspace Training Sessions",
             "Training.delete" => "Myspace Training Sessions",
-            "Training.assign" => "Myspace Training Sessions",
+            'Training.assign_training' => "Myspace Training Sessions",
+            'Training_database.download_excel_report' => "Myspace Training Sessions",
             "Referral.create" => "Myspace Referrals",
             "Referral.view" => "Myspace Referrals",
             "Referral.edit" => "Myspace Referrals",
             "Referral.delete" => "Myspace Referrals",
             "Referral.assign" => "Myspace Referrals",
+            'Export.referral excel report' => "Myspace Referrals",
             "Database_submission.create" => "Database Submission",
             "Database_submission.view" => "Database Submission",
             "Database_submission.edit" => "Database Submission",
@@ -94,7 +98,7 @@ class RolePermissionSeeder extends Seeder
             "Apr.validate" => "APR Management",
             "Apr.download" => "APR Management",
             "Month Report Chart" => "Dashboard",
-            "Project Activities" => "Dashboard",
+            'Project activities' => "Dashboard",
             "filtering" => "Dashboard",
             "View Activities" => "Log System",
             "delete Activities" => "Log System",
@@ -105,7 +109,7 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate([
                 'name' => $permission->value,
                 "label" => strtoupper($permission->value),
-                "group_name" => "group"
+                "group_name" => $permissionGroups[$permission->value]
             ]);
         }
 

@@ -13,6 +13,8 @@ return new class extends Migration
     {
         Schema::table('indicators', function (Blueprint $table) {
             $table->json('monthly_counts')->nullable();
+            $table->foreignId("type_id")->nullable()->constrained("indicator_types")->onDelete("cascade");
+
         });
     }
 

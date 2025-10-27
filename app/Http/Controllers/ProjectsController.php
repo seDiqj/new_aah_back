@@ -324,7 +324,7 @@ class ProjectsController extends Controller
                         $dessaggregation["dessaggration"] = $dessaggregation["description"];
                         $dessaggregation["province"] = Province::find($dessaggregation["province_id"])->name;
                         $dessaggregation["indicatorRef"] = $indicator->indicatorRef;
-                        $dessaggregation["indicatorId"] = $indicator->id;
+                        $dessaggregation["indicatorId"] = $dessaggregation->indicator_id;
 
                         unset(
                             $dessaggregation["description"],
@@ -499,8 +499,8 @@ class ProjectsController extends Controller
     public function changeAprStatus (Request $request, string $id) 
     {
         $validated = $request->validate([
-            "newStatus" => "required|in:notCreatedYet,created,hodDhodApproved,grantFinalized,hqFinalized",
-            "comment" => "string",
+            'newStatus' => 'required|in:notCreatedYet,created,hodDhodApproved,hodDhodRejected,grantFinalized,grantRejected,hqFinalized,hqRejected',
+            'comment' => 'nullable|string',
         ]);
 
         $userId = Auth::user()->id;
@@ -520,38 +520,43 @@ class ProjectsController extends Controller
         $action = null;
 
         switch ($newStatus) {
-            case 'created':
-                $action = "create";
+            case 'notCreatedYet':
+                $action = 'reset';
                 break;
 
-            case 'uncreated':
-                $action = "uncreate";
+            case 'created':
+                $action = 'create';
                 break;
 
             case 'hodDhodApproved':
-                $action = "submit";
+                $action = 'submit';
                 break;
 
-            case 'hodDhodUnApproved':
-                $action = "unsubmit";
+            case 'hodDhodRejected':
+                $action = 'rejectSubmit';
                 break;
 
             case 'grantFinalized':
-                $action = "grantFinalize";
+                $action = 'grantFinalize';
                 break;
 
-            case 'grantUnfinalized':
-                $action = "grantunfinalized";
+            case 'grantRejected':
+                $action = 'rejectGrant';
                 break;
-            
+
             case 'hqFinalized':
-                $action = "hqFinalize";
+                $action = 'hqFinalize';
                 break;
 
-            case 'hqUnFinalized':
-                $action = "hqunfinalized";
+            case 'hqRejected':
+                $action = 'rejectHq';
+                break;
+
+            default:
+                $action = 'unknown';
                 break;
         }
+
 
         ProjectLogs::create([
             "project_id" => $project->id,
@@ -563,6 +568,32 @@ class ProjectsController extends Controller
 
         return response()->json(["status" => true, "message" => "Project APR status updated successfully. \n Check the logs!"]);
         
+    }
+
+    public function getProjectFinalizersDetails(string $id)
+    {
+        $logs = ProjectLogs::with('user')
+            ->where('project_id', $id)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $finalizers = $logs->map(function ($log) {
+            return [
+                'user_id' => $log->user_id,
+                'name' => $log->user ? $log->user->name : null,
+                'avatar' => $log->user ? url("storage/" . $log->user->photo_path) : null, // <<< اینجا
+                'action' => $log->action,
+                'comment' => $log->comment,
+                'result' => $log->result,
+                'step' => $log->project_step ?? null,
+                'date' => $log->created_at->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $finalizers,
+        ]);
     }
 
 }

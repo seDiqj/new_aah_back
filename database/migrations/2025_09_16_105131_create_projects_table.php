@@ -20,7 +20,16 @@ return new class extends Migration
             $table->date("startDate");
             $table->date("endDate");
             $table->enum("status", ["planed", "ongoing", "completed", "onhold", "canclled"]);
-            $table->enum("aprStatus", ["notCreatedYet", "created", "hodDhodApproved", "grantFinalized", "hqFinalized"]);
+            $table->enum("aprStatus", [
+                    "notCreatedYet",
+                    "created",
+                    "hodDhodApproved",
+                    "hodDhodRejected",
+                    "grantFinalized",
+                    "grantRejected",
+                    "hqFinalized",
+                    "hqRejected"
+                ]);
             $table->string("projectManager");
             $table->string("reportingDate");
             $table->string("reportingPeriod");

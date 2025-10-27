@@ -173,6 +173,30 @@ class CommunityDialogueDatabaseController extends Controller
 
     }
 
+    public function showCommunityDialogue($id)
+    {
+        $communityDialogue = CommunityDialogue::with(['program', 'sessions', 'groups'])
+            ->find($id);
+
+        if (!$communityDialogue) {
+            return response()->json([
+                "status" => false,
+                "message" => "Community dialogue not found!"
+            ], 404);
+        }
+
+        return response()->json([
+            "status" => true,
+            "data" => [
+                "programInformation" => $communityDialogue->program,
+                "sessions" => $communityDialogue->sessions,
+                "groups" => $communityDialogue->groups,
+                "remark" => $communityDialogue->remark,
+                "indicator_id" => $communityDialogue->indicator_id,
+            ]
+        ], 200);
+    }
+
     public function storeBeneficiary (Request $request)
     {
         $communityDialogueDb = Database::where("name", "cd_database")->first();
@@ -255,6 +279,55 @@ class CommunityDialogueDatabaseController extends Controller
 
         return response()->json(["status" => true, "message" => "Beneficiary successfully updated !"], 200);
 
+    }
+
+    public function updateCommunityDialogue(Request $request, $id)
+    {
+        $communityDialogue = CommunityDialogue::find($id);
+
+        if (!$communityDialogue) {
+            return response()->json([
+                "status" => false,
+                "message" => "Community dialogue not found!"
+            ], 404);
+        }
+
+        $programInformation = $request->input("programInformation");
+        $communityDialogueIndicator = Indicator::find($programInformation["indicator_id"]);
+
+        if (!$communityDialogueIndicator) {
+            return response()->json([
+                "status" => false,
+                "message" => "Invalid indicator selected!"
+            ], 422);
+        }
+
+        $program = $communityDialogue->program;
+        $program->update($programInformation);
+
+        $communityDialogue->update([
+            "indicator_id" => $communityDialogueIndicator->id,
+            "remark" => $request->remark
+        ]);
+
+        $sessions = $request->input("sessions", []);
+        $communityDialogue->sessions()->delete();
+        foreach ($sessions as $session) {
+            $communityDialogue->sessions()->create($session);
+        }
+
+        $groups = $request->input("groups", []);
+        $communityDialogue->groups()->delete();
+        foreach ($groups as $group) {
+            $communityDialogue->groups()->create([
+                "name" => $group
+            ]);
+        }
+
+        return response()->json([
+            "status" => true,
+            "message" => "Community dialogue successfully updated!"
+        ], 200);
     }
 
     public function destroyBeneficiaries (Request $request)
@@ -369,6 +442,93 @@ class CommunityDialogueDatabaseController extends Controller
             "status" => true,
             "message" => "Beneficiaries successfully added to the community dialogue!"
         ]);
+    }
+
+    public function createNewSession(Request $request)
+    {
+        $validated = $request->validate([
+            "community_dialogue_id" => "required|exists:community_dialogues,id",
+            "topic" => "required|string|min:3",
+            "date" => "required|date"
+        ]);
+
+        $validated["type"] = "followUp";
+
+        $exists = CommunityDialogueSession::where("community_dialogue_id", $validated["community_dialogue_id"])
+            ->where("topic", $validated["topic"])
+            ->where("date", $validated["date"])
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                "status" => false,
+                "message" => "This session already exists for this community dialogue!"
+            ], 409);
+        }
+
+        CommunityDialogueSession::create($validated);
+
+        return response()->json([
+            "status" => true,
+            "message" => "New session successfully created!"
+        ], 201);
+    }
+
+    public function showSession($id)
+    {
+        $session = CommunityDialogueSession::find($id);
+
+        if (!$session) {
+            return response()->json([
+                "status" => false,
+                "message" => "Session not found!"
+            ], 404);
+        }
+
+        return response()->json([
+            "status" => true,
+            "data" => $session
+        ], 200);
+    }
+
+
+    public function updateSession(Request $request, $id)
+    {
+        $session = CommunityDialogueSession::find($id);
+
+        if (!$session) {
+            return response()->json([
+                "status" => false,
+                "message" => "Session not found!"
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            "community_dialogue_id" => "required|exists:community_dialogues,id",
+            "topic" => "required|string|min:3",
+            "date" => "required|date"
+        ]);
+
+        $exists = CommunityDialogueSession::where("community_dialogue_id", $validated["community_dialogue_id"])
+            ->where("topic", $validated["topic"])
+            ->where("date", $validated["date"])
+            ->where("id", "!=", $session->id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                "status" => false,
+                "message" => "A session with the same topic and date already exists for this community dialogue!"
+            ], 409);
+        }
+
+        $session->update($validated);
+
+        return response()->json([
+            "status" => true,
+            "message" => "Session successfully updated!",
+            "data" => $session
+        ], 200);
     }
 
 }

@@ -7,6 +7,7 @@ use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
+use App\Models\Beneficiary;
 use Illuminate\Http\Request;
 
 class GlobalController extends Controller
@@ -66,5 +67,18 @@ class GlobalController extends Controller
         $projects = Project::select("id", "projectCode")->get();
 
         return response()->json(["status" => true, "message" => "", "data" => $projects]);
+    }
+
+    public function changeBeneficiaryAprIncluded (string $id)
+    {
+        $beneficiary = Beneficiary::find($id);
+
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
+
+        $beneficiary->aprIncluded = !$beneficiary->aprIncluded;
+
+        $beneficiary->save();
+
+        return response()->json(["status" => true, "message" => "Beneficiary apr included changed !"]);
     }
 }

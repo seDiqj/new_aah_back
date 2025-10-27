@@ -1,5 +1,7 @@
 <?php
 
+// Note: please do not seed the database twice using this general seeding class.
+
 namespace Database\Seeders;
 
 use App\Models\IndicatorType;
@@ -17,14 +19,15 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // DepartmentsTableSeeder::class,
             // UsersTableSeeder::class,
-            // RoleTableSeeder::class,
+            // RolePermissionSeeder::class,
             // DistrictsTableSeeder::class,
             // ProvincesTableSeeder::class,
             // KitsTableSeeder::class,
             // DatabasesTableSeeder::class,
             // IndicatorsTypeTableSeeder::class,
             // Isp3TableSeeder::class,
-            // QuestionsTableSeeder::class
+            // QuestionsTableSeeder::class,
+            // DeveloperUserSeeder::class
         ]);
 
     }

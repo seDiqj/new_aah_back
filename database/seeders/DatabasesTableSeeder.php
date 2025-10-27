@@ -14,7 +14,7 @@ class DatabasesTableSeeder extends Seeder
     public function run(): void
     {
 
-        $databases = ["main_database", "main_database_meal_tool", "kit_database", "psychoeducation_database", "cd_database", "training_database", "refferal_database"];
+        $databases = ["main_database", "main_database_meal_tool", "kit_database", "psychoeducation_database", "cd_database", "training_database", "refferal_database", "enact_database"];
 
         foreach($databases as $database) {
             Database::create([

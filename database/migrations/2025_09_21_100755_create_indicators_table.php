@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId("output_id")->constrained("outputs")->onDelete("cascade");
             $table->foreignId("parent_indicator")->nullable()->constrained("indicators")->onDelete("cascade");
-            $table->foreignId("type_id")->nullable()->constrained("indicator_types")->onDelete("cascade");
             $table->foreignId("database_id")->constrained("databases")->onDelete("cascade");
             $table->string("indicator");
             $table->string("indicatorRef");
