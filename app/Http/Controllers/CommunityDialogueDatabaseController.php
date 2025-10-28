@@ -32,7 +32,7 @@ class CommunityDialogueDatabaseController extends Controller
 
         $beneficiaries = Beneficiary::whereIn("id", $beneficiariesIds)->get();
 
-        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary fount for community dialogue database !"]. 404);
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary fount for community dialogue database !"], 404);
 
         return response()->json(["status" => true, "message" => "" , "data" => $beneficiaries]);
     }
@@ -185,6 +185,8 @@ class CommunityDialogueDatabaseController extends Controller
             ], 404);
         }
 
+        $communityDialogue->program->indicator_id = $communityDialogue->indicator_id;
+
         return response()->json([
             "status" => true,
             "data" => [
@@ -192,7 +194,6 @@ class CommunityDialogueDatabaseController extends Controller
                 "sessions" => $communityDialogue->sessions,
                 "groups" => $communityDialogue->groups,
                 "remark" => $communityDialogue->remark,
-                "indicator_id" => $communityDialogue->indicator_id,
             ]
         ], 200);
     }
@@ -257,8 +258,8 @@ class CommunityDialogueDatabaseController extends Controller
         $groups = $request->input("groups");
 
         foreach ($groups as $group) {
-    $communityDialogue->groups()->create($group);
-}
+            $communityDialogue->groups()->create($group);
+        }
 
         return response()->json(["status" => true, "message" => "Community dialogue successfully created !"], 200);
 
@@ -317,9 +318,7 @@ class CommunityDialogueDatabaseController extends Controller
         $groups = $request->input("groups", []);
         $communityDialogue->groups()->delete();
         foreach ($groups as $group) {
-            $communityDialogue->groups()->create([
-                "name" => $group
-            ]);
+            $communityDialogue->groups()->create($group);
         }
 
         return response()->json([
