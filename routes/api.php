@@ -82,7 +82,7 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
     Route::post("/", [ProjectsController::class, "storeProject"])->middleware("permission:Project.create");
     Route::post("/{id}", [ProjectsController::class, "updateProject"]);
-    Route::post("/delete_projects", [ProjectsController::class, "destroyProject"])->middleware("permission:Project.delete");
+    Route::post("/d/delete_projects", [ProjectsController::class, "destroyProject"])->middleware("permission:Project.delete");
     Route::post("/submit_new", [ProjectsController::class, "submitNewDatabase"]);
     Route::post("/status/change_apr_status/{id}", [ProjectsController::class, "changeAprStatus"]);
 
@@ -154,11 +154,11 @@ Route::prefix("kit_db")->name("kit_db.")->middleware(["auth:sanctum"])->group(fu
     Route::get("/show_kit/{id}", [KitDatabaseController::class, "showKit"])->middleware("permission:Kit.view");
     Route::post("/beneficiary", [KitDatabaseController::class, "storeBeneficiary"]);
     Route::post("/kit", [KitDatabaseController::class, "storeKit"])->middleware("permission:Kit.create");
+    Route::post("/delete_kit", [KitDatabaseController::class, "destroyKits"])->middleware("permission:Kit.delete");
     Route::post("/add_kit_to_bnf/{id}", [KitDatabaseController::class, "addNewKitToBeneficiary"])->middleware("permission:Kit.create");
     Route::put("/beneficiary/{id}", [KitDatabaseController::class, "updateBeneficiary"])->middleware("permission:Kit.edit");
     Route::put("/kit/{id}", [MainDatabaseController::class, "updateKit"])->middleware("permission:Kit.edit");
     Route::post("/delete_beneficiaries", [KitDatabaseController::class, "destroyBeneficiary"])->middleware("permission:Kit.delete");
-    Route::delete("/kit/{id}", [KitDatabaseController::class, "destroyKit"])->middleware("permission:Kit.delete");
 });
 
 // permissions done need full review
@@ -181,7 +181,7 @@ Route::prefix("community_dialogue_db")->name("community_dialogue_db.")->middlewa
     Route::put("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "updateCommunityDialogue"])->middleware("permission:Dialogue.edit");
     Route::put("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "updateSession"])->middleware("permission:Dialogue.edit");
     Route::post("/delete_beneficiary_sessions/{id}", [CommunityDialogueDatabaseController::class, "destroyBeneficiarySessions"])->middleware("permission:Dialogue.delete");
-    Route::post("/delete_cds", [CommunityDialogueDatabaseController::class, "destroyCommunityDialogues"])->middleware("permission:Dialogue.delete");
+    Route::post("/delete_cds", [CommunityDialogueDatabaseController::class, "destroyCommunityDialogue"])->middleware("permission:Dialogue.delete");
     Route::post("/community_dialogue_db/community_dialogue/sessions/delete_sessions", [CommunityDialogueDatabaseController::class, "destroySessions"])->middleware("permission:Dialogue.delete");
     Route::post("/delete_beneficiaries", [CommunityDialogueDatabaseController::class, "destroyBeneficiaries"])->middleware("permission:Dialogue.delete");
 });
@@ -202,12 +202,15 @@ Route::prefix("training_db")->name("training_db.")->middleware(["auth:sanctum"])
     Route::get("/beneficiary/trainings/{id}", [TrainingController::class, "indexBeneficiaryTrainings"])->middleware("permission:Training.view");
     Route::get("/trainings/for_selection", [TrainingController::class, "indexTrainingsForSelection"])->middleware("permission:Training.view");
     Route::get("/training/{id}", [TrainingController::class, "show"])->middleware("permission:Training.view");
+    Route::get("/beneficiary/{id}", [TrainingController::class, "showBeneficiary"])->middleware("permission:Training.view");
     Route::get("/beneficiary/chapter/preAndPostTest/{bnfId}/{chapterId}", [TrainingController::class, "showBeneficiaryChapterPreAndPostTestScores"])->middleware("permission:Training.view");
+    Route::post("/training", [TrainingController::class, "store"])->middleware("permission:Training.create");
     Route::post("/beneficiary", [TrainingController::class, "storeNewBeneficiary"])->middleware("permission:Training.create");
     Route::post("/beneficiaries/add_training", [TrainingController::class, "addTrainingToBeneficiaries"])->middleware("permission:Training.assign_training");
     Route::put("/beneficiary/chapter/setPrecense/{bnfId}/{chapterId}", [TrainingController::class, "togglePresence"])->middleware("permission:Training.view");
     Route::put("/beneficiary/chapter/setPreAndPostTest/{bnfId}/{chapterId}", [TrainingController::class, "setPreAndPostTest"])->middleware("permission:Training.view");
-    Route::post("/training", [TrainingController::class, "store"])->middleware("permission:Training.create");
+    Route::put("/training/{id}", [TrainingController::class, "update"])->middleware("permission:Training.view");
+    Route::put("/beneficiary/{id}", [TrainingController::class, "updateBeneficiary"])->middleware("permission:Training.view");
     Route::post("/training/chapter/{id}", [TrainingController::class, "storeNewChapter"])->middleware("permission:Training.create");
     Route::post("/delete_trainings", [TrainingController::class, "destroy"])->middleware("permission:Training.delete");
     Route::post("/delete_beneficiaries", [TrainingController::class, "destroyBeneficiaries"])->middleware("permission:Training.delete");
@@ -289,7 +292,7 @@ Route::prefix("db_management")->name("db_management.")->middleware("auth:sanctum
 Route::prefix("apr_management")->name("apr_management.")->middleware("auth:sanctum")->group(function () {
     Route::get("/show_apr/{id}", [AprController::class, "showGeneratedApr"])->middleware("permission:Apr.review");
     Route::get("/get_system_aprs_status", [AprController::class, "getSystemAprsStatus"])->middleware("permission:Apr.view/list");
-    Route::post("/generate_apr/{id}", [AprController::class, "generateApr"])->middleware("permission:Datbase_submission.generate_apr");
+    Route::post("/generate_apr/{id}", [AprController::class, "generateApr"])->middleware("permission:Database_submission.generate_apr");
 });
 
 // Permissions done

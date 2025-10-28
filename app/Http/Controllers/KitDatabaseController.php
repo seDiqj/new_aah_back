@@ -291,7 +291,7 @@ class KitDatabaseController extends Controller
 
     }
 
-    public function destroyKit(Request $request) {
+    public function destroyKits(Request $request) {
 
         $ids = $request->input("ids");
 

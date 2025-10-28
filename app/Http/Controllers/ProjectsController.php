@@ -283,7 +283,7 @@ class ProjectsController extends Controller
     
     public function showProject(string $id) {
 
-        $project = Project::with(["outcomes.outputs.indicators.dessaggregations"])->find($id);
+        $project = Project::with(["outcomes.outputs.indicators.dessaggregations", "provinces", "sectors"])->find($id);
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in database !"], 404);
 
@@ -350,6 +350,14 @@ class ProjectsController extends Controller
             });
 
             return $outcome;
+
+        });
+
+        $project["provinces"] = $project->provinces->map(function ($province) {
+
+            $provinceName = $province->name;
+
+            return $provinceName;
 
         });
 

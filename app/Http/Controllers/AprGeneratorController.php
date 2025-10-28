@@ -259,7 +259,6 @@ class AprGeneratorController extends Controller
 
                             $dessaggregationFromDb->months = $numberOfEnactsPerMonth;
                             $dessaggregationFromDb->achived_target = (collect(...$numberOfEnactsPerMonth))->reduce(function ($carry, $item) {
-                                error_log($item);
                                 return $carry + $item;
                             }, 0); 
                             $dessaggregationFromDb->save();
@@ -305,6 +304,7 @@ class AprGeneratorController extends Controller
 
             foreach ($projectIndicators as $indicator) {
                 $achieved = 0;
+
                 if ($indicator->dessaggregationType === 'indevidual') {
 
                     $achieved = $beneficiaries
@@ -344,9 +344,9 @@ class AprGeneratorController extends Controller
 
                             $total += $ind->sessions->count();
 
-                            $groupDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)
-                                                                            ->where("description", "# 0f group MHPSS consultations")->first();
-                            $individualDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)->where("description", "# 0f indevidual MHPSS consultations")->first();
+                            // $groupDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)
+                                                                            // ->where("description", "# 0f group MHPSS consultations")->first();
+                            // $individualDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)->where("description", "# 0f indevidual MHPSS consultations")->first();
 
                             $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
 
@@ -357,8 +357,9 @@ class AprGeneratorController extends Controller
                     if ($subIndicator) {
                         $beneficiaryCount = $beneficiaries->filter(fn($b) => $b->indicators->contains('id', $indicator->id))->count();
                         $subIndicator->update(['achived_target' => $beneficiaryCount]);
+                        $subIndicator->save();
                         
-                        $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId);
 
                         $updatedIndicators->push($subIndicator);
                     }
@@ -368,49 +369,6 @@ class AprGeneratorController extends Controller
                 $indicator->save();
                 $updatedIndicators->push($indicator);
             }
-
-            $finalAPR = [
-                "impact" => $project->projectGoal,
-                "outcomes" => $projectOutcomes,
-                "outputs" => $projectOutputs,
-                "indicator" => $updatedIndicators->unique("id")
-            ];
-
-
-            // $finalAPR = [
-            //     "impact" => $project->projectGoal,
-            //     "outcomes" => $project->outcomes->map(function ($outcome) use ($updatedIndicators) {
-            //         return [
-            //             "name" => $outcome->outcome,
-            //             "outputs" => $outcome->outputs->map(function ($output) use ($updatedIndicators) {
-            //                 return [
-            //                     "name" => $output->output,
-            //                     "indicators" => $output->indicators->map(function ($indicator) {
-            //                         return [
-            //                             "code" => $indicator->indicatorRef,
-            //                             "name" => $indicator->indicator,
-            //                             "isSub" => false,
-            //                             "disaggregation" => $indicator->dessaggregations->map(function ($d) {
-            //                                 return [
-            //                                     "name" => $d->description,
-            //                                     "target" => $d->target ?? 0,
-            //                                     "months" => $d->months ?? array_fill(0, 12, 0)
-            //                                 ];
-            //                             })->toArray(),
-            //                         ];
-            //                     })->toArray(),
-            //                 ];
-            //             })->toArray(),
-            //         ];
-            //     })->toArray(),
-            // ];
-            
-
-            // return response()->json([
-            //     "status" => true,
-            //     "message" => "Indicators updated successfully.",
-            //     "data" => $finalAPR,
-            // ], 200);
         }
 
         $isp3s = $projectIndicatorsWithDessaggregations->flatMap(function ($indicator) {
@@ -652,6 +610,7 @@ class AprGeneratorController extends Controller
                 if ($monthIndex !== null) $demographicMonthDate["of Female CU5 (girls)"][$monthIndex]++;
             }
         }
+
 
         foreach ($dess as $d) {
             $desc = trim($d->description);

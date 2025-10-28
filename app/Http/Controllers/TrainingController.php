@@ -129,7 +129,6 @@ class TrainingController extends Controller
         ]);
     }
 
-
     public function indexTrainingsForSelection ()
     {
         $trainings = Training::select("name")->get();
@@ -220,37 +219,155 @@ class TrainingController extends Controller
         return response()->json(["status" => true, "message" => "Beneficiary successfully created !"], 200);
     }
 
-    public function show (string $id)
+    public function update(StoreTrainingRequest $request, string $id)
+    {
+        $training = Training::find($id);
+
+        if (!$training)
+            return response()->json([
+                "status" => false,
+                "message" => "No such training found!"
+            ], 404);
+
+        $project = Project::where("projectCode", $request->input("projectCode"))->first();
+        if (!$project)
+            return response()->json(["status" => false, "message" => "Invalid project code!"], 404);
+
+        $province = Province::where("name", $request->input("province"))->first();
+        if (!$province)
+            return response()->json(["status" => false, "message" => "Invalid province!"], 404);
+
+        $indicator = Indicator::where("indicator", $request->input("indicator"))->first();
+        if (!$indicator)
+            return response()->json(["status" => false, "message" => "Invalid indicator!"], 404);
+
+        $district = District::where("name", $request->input("district"))->first();
+        if (!$district)
+            return response()->json(["status" => false, "message" => "Invalid district!"], 404);
+
+        $validated = $request->except("chapters");
+
+        $validated["project_id"] = $project->id;
+        $validated["province_id"] = $province->id;
+        $validated["indicator_id"] = $indicator->id;
+        $validated["district_id"] = $district->id;
+
+        unset($validated["projectCode"], $validated["province"], $validated["indicator"], $validated["district"]);
+
+        $training->update($validated);
+
+        $training->chapters()->delete();
+
+        $chapters = $request->input("chapters", []);
+        foreach ($chapters as $chapter) {
+            $training->chapters()->create($chapter);
+        }
+
+        return response()->json([
+            "status" => true,
+            "message" => "Training successfully updated!"
+        ], 200);
+    }
+
+    
+    public function updateBeneficiary(StoreTrainingBeneficiaryRequest $request, string $id)
+    {
+        $validated = $request->validated();
+
+        $beneficiary = Beneficiary::find($id);
+
+        if (!$beneficiary) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such beneficiary found in the system!"
+            ], 404);
+        }
+
+        $beneficiary->update($validated);
+
+        $trainingDb = Database::where("name", "training_database")->first();
+        if ($trainingDb) {
+            DatabaseProgramBeneficiary::updateOrCreate(
+                [
+                    "beneficiary_id" => $beneficiary->id,
+                    "database_id" => $trainingDb->id,
+                ],
+                [] 
+            );
+        }
+
+        return response()->json([
+            "status" => true,
+            "message" => "Beneficiary successfully updated!",
+            "data" => $beneficiary
+        ], 200);
+    }
+
+    public function show(string $id)
     {
         $training = Training::with(["chapters", "evaluations"])->find($id);
 
-        if (!$training) return response()->json(["status" => false, "message" => "No such training in system !"], 404);
+        if (!$training)
+            return response()->json([
+                "status" => false,
+                "message" => "No such training in system !"
+            ], 404);
 
-        $training["projectCode"] = Project::find($training->project_id)->projectCode;
-        $training["province"] = Province::find($training->province_id)->name;
-        $training["indicator"] = Indicator::find($training->indicator_id)->indicator;
-        $training["district"] = District::find($training->district_id)->name;
+        $training["projectCode"] = optional(Project::find($training->project_id))->projectCode;
+        $training["province"] = optional(Province::find($training->province_id))->name;
+        $training["indicator"] = optional(Indicator::find($training->indicator_id))->indicator;
+        $training["district"] = optional(District::find($training->district_id))->name;
 
-        $chapters = $training->chapters;
+        $training->makeHidden([
+            "project_id",
+            "province_id",
+            "indicator_id",
+            "district_id",
+            "created_at",
+            "updated_at"
+        ]);
 
-        $chapters = $chapters->map(function ($chapter) {
-            unset($chapter->created_at);
-            unset($chapter->updated_at);
-            unset($chapter->training_id);
+        $training->chapters = $training->chapters->map(function ($chapter) {
+            unset($chapter->created_at, $chapter->updated_at, $chapter->training_id);
+            return $chapter;
         });
 
-        $training->chapters = $chapters;
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $training
+        ]);
+    }
 
-        unset($training->project_id);
-        unset($training->province_id);
-        unset($training->indicator_id);
-        unset($training->district_id);
-        unset($training->created_at);
-        unset($training->updated_at);
-        unset($training->id);
+    public function showBeneficiary(string $id)
+    {
+        $beneficiary = Beneficiary::find($id);
 
-        return response()->json(["status" => true, "message" => "", "data" => $training]);
+        if (!$beneficiary) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such beneficiary found in the system!"
+            ], 404);
+        }
 
+        $data = [
+            "id" => $beneficiary->id,
+            "name" => $beneficiary->name,
+            "fatherHusbandName" => $beneficiary->fatherHusbandName,
+            "gender" => $beneficiary->gender,
+            "age" => $beneficiary->age,
+            "phone" => $beneficiary->phone,
+            "email" => $beneficiary->email,
+            "participantOrganization" => $beneficiary->participantOrganization,
+            "jobTitle" => $beneficiary->jobTitle,
+            "dateOfRegistration" => $beneficiary->dateOfRegistration,
+        ];
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $data
+        ], 200);
     }
 
     public function destroy (Request $request)

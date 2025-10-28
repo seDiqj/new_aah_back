@@ -123,7 +123,6 @@ class MainDatabaseController extends Controller
         ]);
     }
 
-
     public function storeSessions (Request $request, string $id)
     {
 
@@ -156,6 +155,11 @@ class MainDatabaseController extends Controller
             if (count($indicator["sessions"]) >= 1) {
                 $beneficiary->indicators()->syncWithoutDetaching([$indicator["id"]]);
             }
+
+            $subIndicator = Indicator::where("parent_indicator", $indicator["id"])->first();
+
+            if ($subIndicator)
+                $beneficiary->indicators()->syncWithoutDetaching([$subIndicator->id]);
 
         }
 

@@ -256,11 +256,9 @@ class CommunityDialogueDatabaseController extends Controller
 
         $groups = $request->input("groups");
 
-        foreach($groups as $group) {
-            $communityDialogue->groups()->create([
-                "name" => $group
-            ]);
-        }
+        foreach ($groups as $group) {
+    $communityDialogue->groups()->create($group);
+}
 
         return response()->json(["status" => true, "message" => "Community dialogue successfully created !"], 200);
 
