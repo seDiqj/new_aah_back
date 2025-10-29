@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
             // IndicatorsTypeTableSeeder::class,
             // Isp3TableSeeder::class,
             // QuestionsTableSeeder::class,
-            // SectorsTableSeeder::class
+            // SectorsTableSeeder::class,
             // DeveloperUserSeeder::class
         ]);
 

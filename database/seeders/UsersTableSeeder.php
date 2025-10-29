@@ -16,12 +16,30 @@ class UsersTableSeeder extends Seeder
     public function run(): void
     {
         User::factory()->create([
-            'name' => 'Test User',
-            "title" => "Menager",
-            'email' => 'test@example.com',
-            "password" => Hash::make("12345678"),
+            'name' => 'Mosa Baregzay',
+            "title" => "Developer",
+            'email' => 'developer@developer.com',
+            "password" => Hash::make("developer123"),
             "status" => "active",
             "department_id" => Department::find(1)->id,
         ]);
+
+        $user = User::where('email', 'developer@developer.com')->first();
+
+        if (! $user) {
+            $this->command->warn('⚠️  User with email admin@example.com not found!');
+            return;
+        }
+
+        $permissions = Permission::pluck('name')->toArray();
+
+        if (empty($permissions)) {
+            $this->command->warn('⚠️  No permissions found. Did you run the permission seeder?');
+            return;
+        }
+
+        $user->syncPermissions($permissions);
+
+        $this->command->info('✅ All permissions assigned successfully to user: ' . $user->email);
     }
 }

@@ -26,7 +26,7 @@ class ProjectsController extends Controller
     {
         $projects = Project::all();
 
-        if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No project available in database records"], 404);
+        if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No project available in database records", "data" => []], 404);
 
         return response()->json(["status" => true, "message" => "", "data" => $projects]);
     }

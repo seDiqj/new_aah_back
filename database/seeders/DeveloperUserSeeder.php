@@ -11,7 +11,7 @@ class DeveloperUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $user = User::where('email', 'test@example.com')->first();
+        $user = User::where('email', 'developer@developer.com')->first();
 
         if (! $user) {
             $this->command->warn('⚠️  User with email admin@example.com not found!');

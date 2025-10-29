@@ -28,6 +28,8 @@ use App\Models\Enact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+error_log("start");
+
 Route::get("/test/{project_id}/{database_id}/{province_id}/{fromDate}/{endDate}", [AprGeneratorController::class, "generate"]);
 
 Route::get('/user', function (Request $request) {

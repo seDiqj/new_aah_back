@@ -16,15 +16,15 @@ return new class extends Migration
             $table->foreignId("project_id")->constrained("projects")->cascadeOnDelete();
             $table->foreignId("user_id")->constrained("users");
             $table->enum('action', [
-    'reset',           // when status is "notCreatedYet"
-    'create',          // created
-    'submit',          // hodDhodApproved
-    'rejectSubmit',    // hodDhodRejected
-    'grantFinalize',   // grantFinalized
-    'rejectGrant',     // grantRejected
-    'hqFinalize',      // hqFinalized
-    'rejectHq',        // hqRejected
-])->default('create');
+                'reset',           // when status is "notCreatedYet"
+                'create',          // created
+                'submit',          // hodDhodApproved
+                'rejectSubmit',    // hodDhodRejected
+                'grantFinalize',   // grantFinalized
+                'rejectGrant',     // grantRejected
+                'hqFinalize',      // hqFinalized
+                'rejectHq',        // hqRejected
+            ])->default('create');
 
             $table->enum("result", ["approved", "rejected"])->nullable();
             $table->text("comment")->nullable();
