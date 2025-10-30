@@ -34,6 +34,7 @@ return new class extends Migration
             $table->string("participantOrganization")->nullable();
             $table->string("email")->nullable();
             $table->boolean("refferedForKit")->nullable()->default(false);
+            $table->boolean("aprIncluded");
             $table->timestamps();
         });
     }

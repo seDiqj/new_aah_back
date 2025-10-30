@@ -308,7 +308,7 @@ class AprGeneratorController extends Controller
                 if ($indicator->dessaggregationType === 'indevidual') {
 
                     $achieved = $beneficiaries
-                        ->filter(fn($b) => $b->indicators->contains('id', $indicator->id))
+                        ->filter(fn($b) => $b->indicators->contains('id', $indicator->id) && $b->aprInclude)
                         ->count();
 
                     $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
@@ -662,15 +662,37 @@ class AprGeneratorController extends Controller
 
             $monthIndex = (int) Carbon::parse($psychoeducation->awarenessDate)->format("n") - 1;
 
-            $demographicMonthDate["Of Male (above 18)"][$monthIndex] += 1;
-            $demographicMonthDate["Of Female (above 18)"][$monthIndex] += 1;
-            $demographicMonthDate["of Male adolescents (12 to 17 years old)"][$monthIndex] += 1;
-            $demographicMonthDate["of Female adolescents (12 to 17 years old)"][$monthIndex] += 1;
 
-            $demographics["Of Male (above 18)"]++;
-            $demographics["Of Female (above 18)"]++;
-            $demographics["of Male adolescents (12 to 17 years old)"]++;
-            $demographics["of Female adolescents (12 to 17 years old)"]++;
+            $numberOfMenAbove18 = (int) $psychoeducation->ofMenHostCommunity ?? 0 + (int)
+                                        $psychoeducation->ofMenIdp ?? 0 + (int)
+                                        $psychoeducation->ofMenRefugee ?? 0 + (int)
+                                        $psychoeducation->ofMenReturnee ?? 0;
+
+            $numberOfWomenAbove18 = (int) $psychoeducation->ofWomenHostCommunity ?? 0 + (int)
+                                          $psychoeducation->ofWomenIdp ?? 0 + (int)
+                                          $psychoeducation->ofWomenRefugee ?? 0 + (int)
+                                          $psychoeducation->ofWomenReturnee ?? 0;
+
+            $numberOfMenUnder18 = (int) $psychoeducation->ofBoyHostCommunity ?? 0 + (int)
+                                        $psychoeducation->ofBoyIdp ?? 0 + (int)
+                                        $psychoeducation->ofBoyRefugee ?? 0 + (int)
+                                        $psychoeducation->ofBoyReturnee ?? 0;
+
+            $numberOfWomenUnder18 = (int) $psychoeducation->ofGirlHostCommunity ?? 0 + (int)
+                                          $psychoeducation->ofGirlIdp ?? 0 + (int)
+                                          $psychoeducation->ofGirlRefugee ?? 0 + (int)
+                                          $psychoeducation->ofGirlReturnee ?? 0;
+
+
+            $demographicMonthDate["Of Male (above 18)"][$monthIndex] += $numberOfMenAbove18;
+            $demographicMonthDate["Of Female (above 18)"][$monthIndex] += $numberOfWomenAbove18;
+            $demographicMonthDate["of Male adolescents (12 to 17 years old)"][$monthIndex] += $numberOfMenUnder18;
+            $demographicMonthDate["of Female adolescents (12 to 17 years old)"][$monthIndex] += $numberOfWomenUnder18;
+
+            $demographics["Of Male (above 18)"] += $numberOfMenAbove18;
+            $demographics["Of Female (above 18)"] += $numberOfWomenAbove18;
+            $demographics["of Male adolescents (12 to 17 years old)"] += $numberOfMenUnder18;
+            $demographics["of Female adolescents (12 to 17 years old)"] += $numberOfWomenUnder18;
         }
             
 

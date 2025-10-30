@@ -28,7 +28,6 @@ use App\Models\Enact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-error_log("start");
 
 Route::get("/test/{project_id}/{database_id}/{province_id}/{fromDate}/{endDate}", [AprGeneratorController::class, "generate"]);
 
@@ -129,6 +128,7 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
     Route::get("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "showBeneficiaryEvaluation"])->middleware("permission:Maindatabase.view");
     Route::get("/program/{id}", [MainDatabaseController::class, "showBeneficiaryProgram"])->middleware("permission:Maindatabase.view");
     Route::get("/indicators/{id}", [MainDatabaseController::class, "indexIndicators"])->middleware("permission:Maindatabase.view");
+    Route::post("/beneficiaries/referrBeneficiaries", [MainDatabaseController::class, "referrBeneficiaries"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary", [MainDatabaseController::class, "storeBeneficiary"])->middleware("permission:Maindatabase.create");
     Route::post("/beneficiary/mealtools/{id}", [MainDatabaseController::class, "storeMealtool"])->middleware("permission:Maindatabase.create");
     Route::post("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "storeBeneficiaryEvaluation"])->middleware("permission:Maindatabase.create");
@@ -223,7 +223,6 @@ Route::prefix("training_db")->name("training_db.")->middleware(["auth:sanctum"])
 Route::prefix("referral_db")->name("referral_db.")->middleware(["auth:sanctum"])->group(function () {
     Route::get("/beneficiaries", [ReferralDatabaseController::class, "index"])->middleware("permission:Referral.view");
     Route::get("/beneficiary/{id}", [ReferralDatabaseController::class, "show"])->middleware("permission:Referral.view");
-    Route::post("/beneficiaries/referrBeneficiaries", [ReferralDatabaseController::class, "referrBeneficiaries"])->middleware("permission:Referral.view");
     Route::put("/beneficiary/updateReferral/{id}", [ReferralDatabaseController::class, "update"])->middleware("permission:Referral.edit");
     Route::post("/delete_beneficiaries", [ReferralDatabaseController::class, "destroy"])->middleware("permission:Referral.delete");
 });

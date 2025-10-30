@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 class DatabaseController extends Controller
 {
     use AprToolsTrait;
+
     public function indexSubmittedDatabases ()
     {
         $submittedDatabases = Apr::where("status", "submitted")->get();
@@ -60,11 +61,17 @@ class DatabaseController extends Controller
     {
         $submittedDatabase = Apr::find($id);
 
-        $project = Project::find($submittedDatabase["project_id"])->first();
+        $project = Project::find($submittedDatabase->project_id);
 
-        $database = Database::find($submittedDatabase["database_id"])->first();
+        if (!$project) return response()->json(["status" => false, "message" => "Invalid project for selected database !"]);
 
-        $province = Province::find($submittedDatabase["province_id"])->first();
+        $database = Database::find($submittedDatabase->database_id);
+
+        if (!$database) return response()->json(["status" => false, "message" => "Invalid database for selected database !"]);
+
+        $province = Province::find($submittedDatabase->province_id);
+
+        if (!$province) return response()->json(["status" => false, "message" => "Invalid province for selected database !"]);
 
         $numberOfProjectIndicators = $this->projectIndicatorsToASpicificDatabase($project, $database->id)->count();
 
@@ -85,6 +92,8 @@ class DatabaseController extends Controller
             "numOfOutputs" => $numberOfProjectOutputs,
             "numOfOutcomes" => $numberOfProjectOutcomes,
             "beneficiaries" => $submittedDatabaseBeneficiaries,
+            "fromDate" => $submittedDatabase->fromDate,
+            "toDate" => $submittedDatabase->toDate,
         ];
 
         return response()->json(["status" => true, "message" => "", "data" => $finalData]);

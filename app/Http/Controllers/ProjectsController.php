@@ -519,6 +519,10 @@ class ProjectsController extends Controller
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in system !"], 404);
 
+        $currentStatus = $project->aprStatus;
+
+        if ($currentStatus == $validated["newStatus"]) return response()->json(["status" => false, "message" => "Project status is already " . $validated["newStatus"]], 422);
+
         $newStatus = $validated["newStatus"];
 
         $project->aprStatus = $newStatus;
@@ -574,7 +578,7 @@ class ProjectsController extends Controller
             "result" => array_key_exists("result", $validated) ? $validated["result"] : null,
         ]);
 
-        return response()->json(["status" => true, "message" => "Project APR status updated successfully. \n Check the logs!"]);
+        return response()->json(["status" => true, "message" => "Project APR status updated successfully. \n Check the logs!", "data" => $validated["newStatus"]]);
         
     }
 

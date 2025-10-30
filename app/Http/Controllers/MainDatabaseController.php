@@ -259,8 +259,7 @@ class MainDatabaseController extends Controller
     }
 
     public function showMealtool(string $id) 
-    {
-        
+    {       
     }
 
     public function showBeneficiaryEvaluation(string $id) {
@@ -353,7 +352,23 @@ class MainDatabaseController extends Controller
         return response()->json(["status" => true, "message" => "Session successfully removed !"], 200);
     }
 
-    public function refferBeneficiary(string $id) {}
+    public function referrBeneficiaries(Request $request)
+    {
+        $ids = $request->input("ids");
+
+        $request->validate([
+            "ids" => "required|array",
+            "ids.*" => "integer"
+        ]);
+
+        $beneficiaries = Beneficiary::whereIn("id", $ids)->get();
+
+        foreach ($beneficiaries as $beneficiary) {
+            $beneficiary->referral()->updateOrCreate([]);
+        }
+
+        return response()->json(["status" => true, "message" => (string) count($beneficiaries) . " added to referral !"], 200);
+    }
 
     public function addBeneficiaryToKitList(string $id) {}
 

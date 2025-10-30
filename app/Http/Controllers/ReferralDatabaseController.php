@@ -41,24 +41,6 @@ class ReferralDatabaseController extends Controller
         return response()->json(["status" => true, "message" => "Beneficiary referral form updated successfully !"], 200);
     }
 
-    public function referrBeneficiaries(Request $request)
-    {
-        $ids = $request->input("ids");
-
-        $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "integer"
-        ]);
-
-        $beneficiaries = Beneficiary::whereIn("id", $ids)->get();
-
-        foreach ($beneficiaries as $beneficiary) {
-            $beneficiary->referral()->updateOrCreate([]);
-        }
-
-        return response()->json(["status" => true, "message" => (string) count($beneficiaries) . " added to referral !"], 200);
-    }
-
     public function destroy (Request $request)
     {
         $ids = $request->input("ids");
