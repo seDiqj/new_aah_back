@@ -29,6 +29,7 @@ class Beneficiary extends Model
         "incentiveAmount",
         "participantOrganization",
         "email",
+        "aprIncluded"
     ];
 
 

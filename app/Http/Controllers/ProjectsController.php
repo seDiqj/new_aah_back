@@ -19,6 +19,7 @@ use App\Models\Sector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
 
 class ProjectsController extends Controller
 {
@@ -334,7 +335,6 @@ class ProjectsController extends Controller
                             $dessaggregation["province_id"],
                             $dessaggregation["achived_target"],
                             $dessaggregation["id"],
-                            // $dessaggregation["indicator_id"],
                             $dessaggregation["months"],
                         );
 
@@ -360,6 +360,17 @@ class ProjectsController extends Controller
             return $provinceName;
 
         });
+
+        $project["thematicSector"] = $project->sectors->map(function ($sector) {
+            return $sector->name;
+        });
+
+        $project = $project->toArray();
+
+        $project["startDate"] = Carbon::parse($project["startDate"])->format("Y-m-d");
+        $project["endDate"] = Carbon::parse($project["startDate"])->format("Y-m-d");
+
+        unset($project["sectors"]);
 
         return response()->json(["status" => true, "message" => "", "data" => $project]);
 

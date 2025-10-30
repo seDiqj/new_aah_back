@@ -305,4 +305,5 @@ Route::prefix("filter")->name("filter.")->middleware("auth:sanctum")->group(func
     Route::post("/kit_database/program", [FilterTablesController::class, "filterKitDbPrograms"])->middleware("permission:Kitdatabase.view");
     Route::post("/cd_database/beneficiaries", [FilterTablesController::class, "filterCdDbBnf"])->middleware("permission:Dialogue.view");
     Route::post("/psychoeducation_db/psychoeducations", [FilterTablesController::class, "filterPsychoeducations"])->middleware("permission:Psychoeducation.view");
+    Route::post("/cd_database/cds", [FilterTablesController::class, "filterCds"])->middleware("permission:Dialogue.view");
 });

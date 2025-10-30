@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Program;
 use App\Models\Indicator;
+use App\Models\CommunityDialogue;
+use App\Models\Province;
 use Illuminate\Http\Request;
 
 class FilterTablesController extends Controller
@@ -349,7 +351,7 @@ class FilterTablesController extends Controller
 
     public function filterPsychoeducations(Request $request)
     {
-        $psychoeducationDatabaseID = \App\Models\Database::where('name', 'psychoeducation_database')->value('id');
+        $psychoeducationDatabaseID = Database::where('name', 'psychoeducation_database')->value('id');
 
         if (!$psychoeducationDatabaseID) {
             return response()->json([
@@ -359,51 +361,34 @@ class FilterTablesController extends Controller
             ], 404);
         }
 
-        $query = \App\Models\Psychoeducations::query()
-            ->with(['program.project', 'program.province', 'program.district']);
+        $query = Psychoeducations::with(['program.project', 'program.province', 'program.district'])
+            ->whereHas('program', function ($q) use ($psychoeducationDatabaseID, $request) {
+                $q->where('database_id', $psychoeducationDatabaseID);
 
-        $query->whereHas('program', function($q) use ($psychoeducationDatabaseID, $request) {
-            $q->where('database_id', $psychoeducationDatabaseID);
-
-            if ($request->filled('projectCode')) {
-                $q->whereHas('project', function($q2) use ($request) {
-                    $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
-                });
-            }
-
-            if ($request->filled('focalPoint')) {
-                $q->where('focalPoint', $request->focalPoint);
-            }
-
-            if ($request->filled('province')) {
-                $provinceId = \App\Models\Province::where('name', $request->province)->value('id');
-                if ($provinceId) {
-                    $q->where('province_id', $provinceId);
+                if ($request->filled('projectCode')) {
+                    $q->whereHas('project', function ($q2) use ($request) {
+                        $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                    });
                 }
-            }
 
-            if ($request->filled('siteCode')) {
-                $q->where('siteCode', $request->siteCode);
-            }
+                if ($request->filled('focalPoint')) $q->where('focalPoint', $request->focalPoint);
 
-            if ($request->filled('healthFacilityName')) {
-                $q->where('healthFacilityName', 'like', '%' . $request->healthFacilityName . '%');
-            }
+                if ($request->filled('province')) {
+                    $provinceId = Province::where('name', $request->province)->value('id');
+                    if ($provinceId) $q->where('province_id', $provinceId);
+                }
 
-            if ($request->filled('interventionModality')) {
-                $q->where('interventionModality', 'like', '%' . $request->interventionModality . '%');
-            }
-        });
+                if ($request->filled('siteCode')) $q->where('siteCode', $request->siteCode);
+                if ($request->filled('healthFacilityName')) $q->where('healthFacilityName', 'like', '%' . $request->healthFacilityName . '%');
+                if ($request->filled('interventionModality')) $q->where('interventionModality', 'like', '%' . $request->interventionModality . '%');
+            });
 
         if ($request->filled('indicator')) {
-            $query->where('indicator_id', function($q) use ($request) {
-                $q->from('indicators')->select('id')->where('indicator', 'like', '%' . $request->indicator . '%');
-            });
+            $indicatorIds = Indicator::where('indicator', 'like', '%' . $request->indicator . '%')->pluck('id');
+            $query->whereIn('indicator_id', $indicatorIds);
         }
 
-        if ($request->filled('awarenessDate')) {
-            $query->where('awarenessDate', $request->awarenessDate);
-        }
+        if ($request->filled('awarenessDate')) $query->where('awarenessDate', $request->awarenessDate);
 
         $psychoeducations = $query->get();
 
@@ -415,15 +400,19 @@ class FilterTablesController extends Controller
             ], 404);
         }
 
-        $psychoeducations = $psychoeducations->map(function ($p) {
+        $indicatorRefs = Indicator::pluck('indicatorRef', 'id');
+
+        $psychoeducations = $psychoeducations->map(function ($p) use ($indicatorRefs) {
             return [
                 'id' => $p->id,
                 'program' => $p->program->focalPoint ?? null,
-                'indicator' => Indicator::find($p->indicator_id)->indicatorRef ?? null,
-                'awarenessDate' => $p->awarenessDate,
+                'indicator' => $indicatorRefs[$p->indicator_id] ?? null,
+                'awarenessDate' => $p->awarenessDate
+                    ? Date::parse($p->awarenessDate)->format('Y-m-d')
+                    : null,
                 'awarenessTopic' => $p->awarenessTopic,
             ];
-        })->values(); 
+        })->values();
 
         return response()->json([
             "status" => true,
@@ -525,4 +514,70 @@ class FilterTablesController extends Controller
     }
 
 
+    public function filterCds(Request $request)
+    {
+        $query = CommunityDialogue::with([
+            'program.project',
+            'program.province',
+            'indicator'
+        ]);
+
+        if ($request->filled('projectCode')) {
+            $query->whereHas('program.project', function ($q) use ($request) {
+                $q->where('projectCode', 'like', '%' . $request->projectCode . '%');
+            });
+        }
+
+        if ($request->filled('focalPoint')) {
+            $query->whereHas('program', function ($q) use ($request) {
+                $q->where('focalPoint', 'like', '%' . $request->focalPoint . '%');
+            });
+        }
+
+        if ($request->filled('province')) {
+            $provinceId = Province::where('name', $request->province)->value('id');
+            if ($provinceId) {
+                $query->whereHas('program', function ($q) use ($provinceId) {
+                    $q->where('province_id', $provinceId);
+                });
+            }
+        }
+
+        if ($request->filled('indicator')) {
+            $indicatorIds = Indicator::where('indicator', 'like', '%' . $request->indicator . '%')
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($indicatorIds)) {
+                $query->whereIn('indicator_id', $indicatorIds);
+            }
+        }
+
+        $cds = $query->get();
+
+        if ($cds->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No community dialogue records found",
+                "data" => [],
+            ], 404);
+        }
+
+        $cds = $cds->map(function ($cd) {
+            return [
+                'id' => $cd->id,
+                'projectCode' => $cd->program->project->projectCode ?? null,
+                'focalPoint' => $cd->program->focalPoint ?? null,
+                'province' => $cd->program->province->name ?? null,
+                'indicator' => $cd->indicator->indicatorRef ?? null,
+                'remark' => $cd->remark,
+            ];
+        })->values();
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $cds,
+        ]);
+    }
 }

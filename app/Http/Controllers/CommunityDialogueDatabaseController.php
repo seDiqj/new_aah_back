@@ -208,6 +208,8 @@ class CommunityDialogueDatabaseController extends Controller
 
         $data = $request->all();
 
+        $data["aprIncluded"] = true;
+
         $beneficiary = Beneficiary::create($data);
 
         DatabaseProgramBeneficiary::create([

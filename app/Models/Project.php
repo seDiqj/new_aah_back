@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Outcome;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Project extends Model
 {
@@ -25,8 +26,8 @@ class Project extends Model
     ];
 
     protected $casts = [
-        'startDate' => 'date',
-        'endDate' => 'date',
+        'startDate' => 'datetime',
+        'endDate' => 'datetime',
     ];
 
     public function outcomes()
