@@ -127,6 +127,8 @@ class KitDatabaseController extends Controller
 
         $validated["protectionServices"] = null;
 
+        $validated["aprIncluded"] = true;
+
         $beneficiary = Beneficiary::create($validated);
 
         $beneficiary->indicators()->sync($indicatorIds);

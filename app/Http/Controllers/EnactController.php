@@ -68,26 +68,32 @@ class EnactController extends Controller
         return response()->json(["status" => true, "message" => "Assessment successfully updated !"], 200);
     }
 
-    public function show (string $id)
+    public function showForProfile (string $id)
     {
         $enact = Enact::find($id);
 
         if (!$enact) return response()->json(["status" => false, "message" => "No such assessment in system !"], 404);
 
-        $enact["project Code"] = Project::find($enact["project_id"])->projectCode;
+        $enact["projectCode"] = Project::find($enact["project_id"])->projectCode;
         $enact["Indicator Reference"] = Indicator::find($enact["indicator_id"])->indicatorRef;
         $enact["Province"] = Province::find($enact["province_id"])->name;
 
         unset($enact["project_id"], $enact["indicator_id"], $enact["province_id"]);
 
-
         $assessments = $enact->assessments()->select("id")->get();
 
-        if ($assessments->isEmpty()) return response()->json(["status" => false, "message" => "No assess for current assessment !"], 404);
-
-        
+        // if ($assessments->isEmpty()) return response()->json(["status" => false, "message" => "No assess for current assessment !"], 404);
 
         $enact["assessments"] = $assessments;
+
+        return response()->json(["status" => true, "message" => "" , "data" => $enact]);
+    }
+
+    public function show (string $id)
+    {
+        $enact = Enact::find($id);
+
+        if (!$enact) return response()->json(["status" => false, "message" => "No such assessment in system !"], 404);
 
         return response()->json(["status" => true, "message" => "" , "data" => $enact]);
     }

@@ -7,6 +7,16 @@ use App\Models\Program;
 use App\Models\Indicator;
 use App\Models\CommunityDialogue;
 use App\Models\Province;
+use App\Models\Database;
+use App\Models\Psychoeducations;
+use App\Models\Beneficiary;
+use App\Models\Training;
+use App\Models\District;
+use App\Models\Enact;
+use App\Models\User;
+use App\Models\Apr;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 
 class FilterTablesController extends Controller
@@ -77,7 +87,7 @@ class FilterTablesController extends Controller
 
     public function filterMainDbBnf(Request $request)
     {
-        $mainDatabaseId = \App\Models\Database::where('name', 'main_database')->value('id');
+        $mainDatabaseId = Database::where('name', 'main_database')->value('id');
 
         if (!$mainDatabaseId) {
             return response()->json([
@@ -87,7 +97,7 @@ class FilterTablesController extends Controller
             ], 404);
         }
 
-        $query = \App\Models\Beneficiary::query()
+        $query = Beneficiary::query()
             ->with(['programs.project', 'indicators', 'mealTools']);
 
         $query->whereHas('programs', function($q) use ($request, $mainDatabaseId) {
@@ -384,7 +394,7 @@ class FilterTablesController extends Controller
             });
 
         if ($request->filled('indicator')) {
-            $indicatorIds = Indicator::where('indicator', 'like', '%' . $request->indicator . '%')->pluck('id');
+            $indicatorIds = Indicator::where('indicatorRef', 'like', '%' . $request->indicator . '%')->pluck('id');
             $query->whereIn('indicator_id', $indicatorIds);
         }
 
@@ -407,9 +417,7 @@ class FilterTablesController extends Controller
                 'id' => $p->id,
                 'program' => $p->program->focalPoint ?? null,
                 'indicator' => $indicatorRefs[$p->indicator_id] ?? null,
-                'awarenessDate' => $p->awarenessDate
-                    ? Date::parse($p->awarenessDate)->format('Y-m-d')
-                    : null,
+                'awarenessDate' => $p->awarenessDate,
                 'awarenessTopic' => $p->awarenessTopic,
             ];
         })->values();
@@ -434,7 +442,7 @@ class FilterTablesController extends Controller
         }
 
         $query = \App\Models\Beneficiary::query()
-            ->with(['programs.project', 'indicators', 'mealTools']);
+            ->with(['programs.project', 'indicators']);
 
         $query->whereHas('programs', function($q) use ($request, $cdDatabaseID) {
             $q->where('database_program_beneficiary.database_id', $cdDatabaseID);
@@ -450,16 +458,11 @@ class FilterTablesController extends Controller
             }
 
             if ($request->filled('province')) {
-                $q->where('province_id', $request->province);
+                $q->whereHas("province", function ($q2) use ($request) {
+                    $q2->where("name", $request->province);
+                });
             }
 
-            if ($request->filled('siteCode')) {
-                $q->where('siteCode', $request->siteCode);
-            }
-
-            if ($request->filled('healthFacilitator')) {
-                $q->where('healthFacilityName', 'like', '%' . $request->healthFacilitator . '%');
-            }
         });
 
         if ($request->filled('dateOfRegistration')) {
@@ -470,29 +473,9 @@ class FilterTablesController extends Controller
             $query->where('age', $request->age);
         }
 
-        if ($request->filled('maritalStatus')) {
-            $query->where('maritalStatus', $request->maritalStatus);
-        }
-
-        if ($request->filled('householdStatus')) {
-            $query->where('householdStatus', 'like', '%' . $request->householdStatus . '%');
-        }
-
-        if ($request->filled('baselineDate')) {
-            $query->whereHas('mealTools', function($q) use ($request) {
-                $q->where('baselineDate', $request->baselineDate);
-            });
-        }
-
-        if ($request->filled('endlineDate')) {
-            $query->whereHas('mealTools', function($q) use ($request) {
-                $q->where('endlineDate', $request->endlineDate);
-            });
-        }
-
         if ($request->filled('indicator')) {
             $query->whereHas('indicators', function($q) use ($request) {
-                $q->where('indicator', 'like', '%' . $request->indicator . '%');
+                $q->where('indicatorRef', 'like', '%' . $request->indicator . '%');
             });
         }
 
@@ -512,7 +495,6 @@ class FilterTablesController extends Controller
             "data" => $beneficiaries,
         ]);
     }
-
 
     public function filterCds(Request $request)
     {
@@ -535,21 +517,19 @@ class FilterTablesController extends Controller
         }
 
         if ($request->filled('province')) {
-            $provinceId = Province::where('name', $request->province)->value('id');
-            if ($provinceId) {
-                $query->whereHas('program', function ($q) use ($provinceId) {
-                    $q->where('province_id', $provinceId);
+            $query->whereHas('program', function ($q) use ($request) {
+                $q->whereHas("province", function ($q2) use ($request) {
+                    $q2->where("name", $request->province);
                 });
-            }
+            });
         }
 
         if ($request->filled('indicator')) {
-            $indicatorIds = Indicator::where('indicator', 'like', '%' . $request->indicator . '%')
-                ->pluck('id')
-                ->toArray();
 
             if (!empty($indicatorIds)) {
-                $query->whereIn('indicator_id', $indicatorIds);
+                $query->whereHas('indicator', function ($q) use ($request) {
+                    $q->where("indicatorRef", $request->indicator);
+                });
             }
         }
 
@@ -558,7 +538,7 @@ class FilterTablesController extends Controller
         if ($cds->isEmpty()) {
             return response()->json([
                 "status" => false,
-                "message" => "No community dialogue records found",
+                "message" => "No community dialogue records found for applied filters !",
                 "data" => [],
             ], 404);
         }
@@ -578,6 +558,490 @@ class FilterTablesController extends Controller
             "status" => true,
             "message" => "",
             "data" => $cds,
+        ]);
+    }
+
+    public function filterTrainings (Request $request)
+    {
+        $query = Training::query();
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("indicatorRef"))
+                $query->whereHas("indicator", function ($q) use ($request) {
+                    $q->where("indicatorRef", $request->indicatorRef);
+                });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        $trainings = $query->get();
+
+        if ($trainings->isEmpty()) {
+
+            return response()->json([
+                "status" => false,
+                "message" => "No trainings was found for applied filters",
+                "data" => []
+            ]);
+        }
+
+        $trainings = $trainings->map(function ($training) {
+            $training["projectCode"] = Project::find($training->project_id)->projectCode;
+            $training["province"] = Province::find($training->province_id)->name;
+            $training["indicator"] = Indicator::find($training->indicator_id)->indicator;
+            $training["district"] = District::find($training->district_id)->name;
+
+            unset($training["project_id"]);
+            unset($training["province_id"]);
+            unset($training["indicator_id"]);
+            unset($training["district_id"]);
+
+            return $training;
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $trainings
+        ]);
+    }
+
+    public function filterTrainingDatabaseBnf (Request $request)
+    {
+
+        $query = Beneficiary::query()
+            ->with(['trainings']);
+        
+        
+        $query->whereHas('trainings', function($q) use ($request) {
+
+            if ($request->filled('projectCode')) {
+                $q->whereHas('project', function($q2) use ($request) {
+                    $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                });
+            }
+
+            if ($request->filled('province')) {
+                $q->whereHas('province', function ($q) use ($request) {
+                    $q->where("name", "like", "%" . $request->province . "%");
+                });
+            }
+
+            if ($request->filled('indicator')) {
+                $q->whereHas("indicator", function ($q) use ($request) {
+                    $q->where("indicatorRef", "like", "%" . $request->indicator . "%");
+                });
+            }
+
+        });
+
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', $request->dateOfRegistration);
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', $request->age);
+        }
+
+        if ($request->filled('gender')){
+            $query->where("age", $request->age);
+        }
+
+        $beneficiaries = $query->get();
+
+        if ($beneficiaries->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No beneficiary found in database records",
+                "data" => [],
+            ], 404);
+        }
+
+         return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $beneficiaries,
+        ]);
+    }
+
+    public function filterRereralDatabaseBnf (Request $request)
+    {
+        $query = Beneficiary::query()->whereHas("referral");
+
+        if ($request->filled("age")) 
+            $query->where("age", $request->age);
+        
+
+        if ($request->filled("gender")) 
+            $query->where("gender", $request->gender);
+
+        if ($request->filled("dateOfRegistration"))
+            $query->where("dateOfRegistration", $request->dateOfRegistration);
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("programs", function ($q) use ($request) {
+                $q->whereHas("project", function ($q2) use ($request) {
+                    $q2->where("projectCode", $request->projectCode);
+                });
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("programs", function ($q) use ($request) {
+                $q->whereHas("province", function ($q2) use ($request) {
+                    $q2->where("name", $request->province);
+                });
+            });
+
+        $beneficiaries = $query->get();
+
+        if ($beneficiaries->isEmpty())
+            return response()->json(["status" => false, "message" => "No beneficiary was found for applied filters !"], 404);
+
+        return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
+    }
+
+    public function filterEnacts (Request $request)
+    {
+        $query = Enact::query();
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        if ($request->filled("indicator"))
+            $query->whereHas("indicator", function ($q) use ($request) {
+                $q->where("indicatorRef", $request->indicator);
+            });
+
+        if ($request->filled("date"))
+            $query->where("date", $request->date);
+
+        $enacts = $query->get();
+
+        if ($enacts->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No assessmensts was found for aplied filters !",
+                "data" => [],
+            ]);
+
+        $enacts->map(function ($enact) {
+            $enact["projectCode"] = Project::find($enact["project_id"])->projectCode;
+            $enact["province"] = Province::find($enact["province_id"])->name;
+            $enact["indicatorRef"] = Indicator::find($enact["indicator_id"])->indicatorRef;
+
+            unset($enact["project_id"], $enact["province_id"], $enact["indicator_id"]);
+
+            return $enact;
+        });
+
+        return response()->json(["status" => true, "message" => "", "data" => $enacts]);
+    }
+
+    public function filterUsers (Request $request)
+    {
+        $query = User::query();
+
+        if ($request->filled("name"))
+            $query->where("name", $request->name);
+
+        if ($request->filled("email"))
+            $query->where("email", $request->email);
+
+        if ($request->filled("title"))
+            $query->where("title", $request->title);
+
+        if ($request->filled("status"))
+            $query->where("status", $request->status);
+
+        if ($request->filled("created_at"))
+            $query->where("created_at", $request->created_at);
+
+        $users = $query->get();
+
+        if ($users->isEmpty())
+            return response()->json([
+                    "status" => false,
+                    "message" => "No users was found for applied filters",
+                    "data" => [],
+            ]);
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $users,
+        ]);
+
+    }
+
+    public function filterRoles (Request $request)
+    {
+        $query = Role::query();
+
+        if ($request->filled("name"))
+            $query->where("name", $request->name);
+
+        if ($request->filled("status"))
+            $query->where("status", $request->status);
+
+        $roles = $query->get();
+
+        if ($roles->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No roles was found for applied filters",
+                "data" => []
+            ]);
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $roles
+        ]);
+
+    }
+
+    public function filterPermissoins (Request $request)
+    {
+        $query = Permission::query();
+
+        if ($request->filled("group_name"))
+            $query->where("group_name", $request->group_name);
+
+        $permissions = $query->get();
+
+        if ($permissions->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No permissions was found for applied filters !",
+                "data" => []
+            ]);
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $permissions
+        ]);
+    }
+
+    public function filterSubmittedDatabases (Request $request)
+    {
+        $query = Apr::query()->where("status", "submitted")->orWhere("status", "firstRejected");
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("database"))
+            $query->whereHas("database", function ($q) use ($request) {
+                $q->where("name", $request->database);
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        if ($request->filled("fromDate"))
+            $query->where("fromDate", $request->fromDate);
+
+        if ($request->filled("toDate"))
+            $query->where("toDate", $request->toDate);
+
+        $aprs = $query->get();
+
+        if ($aprs->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No submitted database was found for applied filters !",
+                "data" => []
+            ]);
+
+        $aprs->map(function ($submittedDatabase) {
+
+            $submittedDatabase["projectCode"] = Project::find($submittedDatabase["project_id"])->projectCode;
+            $submittedDatabase["province"] = Province::find($submittedDatabase["province_id"])->name;
+            $submittedDatabase["database"] = Database::find($submittedDatabase["database_id"])->name;
+
+            unset($submittedDatabase["project_id"], $submittedDatabase["database_id"], $submittedDatabase["province_id"]);
+
+            return $submittedDatabase;
+
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
+        ]);
+    }
+    public function filterApprovedDatabases (Request $request)
+    {
+        $query = Apr::query()->where("status", "firstApproved")->orWhere("status", );
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("database"))
+            $query->whereHas("database", function ($q) use ($request) {
+                $q->where("name", $request->database);
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        if ($request->filled("fromDate"))
+            $query->where("fromDate", $request->fromDate);
+
+        if ($request->filled("toDate"))
+            $query->where("toDate", $request->toDate);
+
+        $aprs = $query->get();
+
+        if ($aprs->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No submitted database was found for applied filters !",
+                "data" => []
+            ]);
+
+        $aprs->map(function ($submittedDatabase) {
+
+            $submittedDatabase["projectCode"] = Project::find($submittedDatabase["project_id"])->projectCode;
+            $submittedDatabase["province"] = Province::find($submittedDatabase["province_id"])->name;
+            $submittedDatabase["database"] = Database::find($submittedDatabase["database_id"])->name;
+
+            unset($submittedDatabase["project_id"], $submittedDatabase["database_id"], $submittedDatabase["province_id"]);
+
+            return $submittedDatabase;
+
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
+        ]);
+    }
+    public function filterReviwedAprs (Request $request)
+    {
+        $query = Apr::query()->where("status", "secondRejected")->orWhere("status", "firstApproved");
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("database"))
+            $query->whereHas("database", function ($q) use ($request) {
+                $q->where("name", $request->database);
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        if ($request->filled("fromDate"))
+            $query->where("fromDate", $request->fromDate);
+
+        if ($request->filled("toDate"))
+            $query->where("toDate", $request->toDate);
+
+        $aprs = $query->get();
+
+        if ($aprs->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No submitted database was found for applied filters !",
+                "data" => []
+            ]);
+
+        $aprs->map(function ($submittedDatabase) {
+
+            $submittedDatabase["projectCode"] = Project::find($submittedDatabase["project_id"])->projectCode;
+            $submittedDatabase["province"] = Province::find($submittedDatabase["province_id"])->name;
+            $submittedDatabase["database"] = Database::find($submittedDatabase["database_id"])->name;
+
+            unset($submittedDatabase["project_id"], $submittedDatabase["database_id"], $submittedDatabase["province_id"]);
+
+            return $submittedDatabase;
+
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
+        ]);
+    }
+    public function filterApprovedAprs (Request $request)
+    {
+        $query = Apr::query()->where("status", "reviewed")->orWhere("status", "secondApproved");
+
+        if ($request->filled("projectCode"))
+            $query->whereHas("project", function ($q) use ($request) {
+                $q->where("projectCode", $request->projectCode);
+            });
+
+        if ($request->filled("database"))
+            $query->whereHas("database", function ($q) use ($request) {
+                $q->where("name", $request->database);
+            });
+
+        if ($request->filled("province"))
+            $query->whereHas("province", function ($q) use ($request) {
+                $q->where("name", $request->province);
+            });
+
+        if ($request->filled("fromDate"))
+            $query->where("fromDate", $request->fromDate);
+
+        if ($request->filled("toDate"))
+            $query->where("toDate", $request->toDate);
+
+        $aprs = $query->get();
+
+        if ($aprs->isEmpty())
+            return response()->json([
+                "status" => false,
+                "message" => "No submitted database was found for applied filters !",
+                "data" => []
+            ]);
+
+        $aprs->map(function ($submittedDatabase) {
+
+            $submittedDatabase["projectCode"] = Project::find($submittedDatabase["project_id"])->projectCode;
+            $submittedDatabase["province"] = Province::find($submittedDatabase["province_id"])->name;
+            $submittedDatabase["database"] = Database::find($submittedDatabase["database_id"])->name;
+
+            unset($submittedDatabase["project_id"], $submittedDatabase["database_id"], $submittedDatabase["province_id"]);
+
+            return $submittedDatabase;
+
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
         ]);
     }
 }

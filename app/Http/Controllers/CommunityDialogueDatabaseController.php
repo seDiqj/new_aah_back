@@ -91,8 +91,10 @@ class CommunityDialogueDatabaseController extends Controller
 
         if ($sessions->isEmpty()) return response()->json(["status" => false, "message" => "No session was found for current beneficiary !"], 404);
 
-        $sessions->map(function ($session) {
-            unset($session["community_dialogue_id"]);
+        $sessions = $sessions->map(function ($session) {
+            $session["isPresent"] = (bool) $session->pivot->isPresent;
+
+            unset($session["pivot"], $session["community_dialogue_id"]);
 
             return $session;
         });
@@ -228,11 +230,9 @@ class CommunityDialogueDatabaseController extends Controller
 
         if (!$communityDialogueDatabase) return response()->json(["status" => false, "message" => "Community dialogue is not a valid database !"], 422);
 
-
         $programInformation = $request->input("programInformation");
 
         $communityDialogueIndicator = Indicator::find($programInformation["indicator_id"]);
-
 
         if (!$communityDialogueDatabase) return response()->json(["status" => false, "message" => "Invalid indicator selected !"], 422);
 
@@ -248,19 +248,23 @@ class CommunityDialogueDatabaseController extends Controller
         $communityDialogue = CommunityDialogue::create([
             "program_id" => $program->id,
             "indicator_id" => $communityDialogueIndicator->id,
-            "remark" => $request->remark
+            "remark" => $request->remark ?? ""
         ]);
 
         $sessions = $request->input("sessions");
 
-        foreach($sessions as $session) {
-            $communityDialogue->sessions()->create($session);
+        if ($sessions) {
+            foreach($sessions as $session) {
+                $communityDialogue->sessions()->create($session);
+            }
         }
 
         $groups = $request->input("groups");
 
-        foreach ($groups as $group) {
-            $communityDialogue->groups()->create($group);
+        if ($groups) {
+            foreach ($groups as $group) {
+                $communityDialogue->groups()->create($group);
+            }
         }
 
         return response()->json(["status" => true, "message" => "Community dialogue successfully created !"], 200);
@@ -429,7 +433,11 @@ class CommunityDialogueDatabaseController extends Controller
                     $communityDialogue->indicator_id => ["updated_at" => now()]
                 ]);
 
-                DatabaseProgramBeneficiary::create([
+                DatabaseProgramBeneficiary::updateOrCreate([
+                    "database_id" => Database::where("name", "cd_database")->first()->id,
+                    "beneficiary_id" => $beneficiary->id,
+                    "program_id" => null
+                ],[
                     "database_id" => Database::where("name", "cd_database")->first()->id,
                     "program_id" => $communityDialogue->program_id,
                     "beneficiary_id" => $beneficiary->id
@@ -490,7 +498,6 @@ class CommunityDialogueDatabaseController extends Controller
         ], 200);
     }
 
-
     public function updateSession(Request $request, $id)
     {
         $session = CommunityDialogueSession::find($id);
@@ -528,6 +535,37 @@ class CommunityDialogueDatabaseController extends Controller
             "message" => "Session successfully updated!",
             "data" => $session
         ], 200);
+    }
+
+    public function togglePresence (Request $request, string $id)
+    {
+
+        $request->validate([
+            "selectedRows" => "required|array",
+            "selectedRows.*" => "integer"
+        ]);
+
+        $beneficiary = Beneficiary::find($id);
+
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
+
+        $sessionsIds = $request->input("selectedRows");
+
+        $sessions = CommunityDialogueSession::whereIn("id", $sessionsIds)->get();
+
+        if ($sessions->isEmpty())
+            return response()->json(["status" => false, "message" => "No such sessions in system !"], 404);
+
+        foreach ($sessions as $session) {
+
+            $pivot = BeneficiaryCommunityDialogueSession::where("beneficiary_id", $beneficiary->id)->where("community_dialogue_session_id", $session->id)->first();
+
+            $pivot->isPresent = !$pivot->isPresent;
+
+            $pivot->save();
+        }
+
+        return response()->json(["status" => true, "message" => "Presence status successfully changed !"], 200);
     }
 
 }

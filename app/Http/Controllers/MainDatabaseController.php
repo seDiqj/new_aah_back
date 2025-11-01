@@ -178,6 +178,8 @@ class MainDatabaseController extends Controller
 
         $validated = $request->validated();
 
+        $validated["aprIncluded"] = true;
+
         $beneficiary = Beneficiary::create($validated);
 
         $mainDbId = Database::where("name", "main_database")->first()->id;

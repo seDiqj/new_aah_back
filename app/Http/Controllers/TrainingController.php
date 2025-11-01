@@ -209,6 +209,8 @@ class TrainingController extends Controller
 
         $trainingDbId = $trainingDb->id;
 
+        $validated["aprIncluded"] = true;
+
         $beneficiary = Beneficiary::create($validated);
 
         DatabaseProgramBeneficiary::create([
@@ -268,7 +270,6 @@ class TrainingController extends Controller
             "message" => "Training successfully updated!"
         ], 200);
     }
-
     
     public function updateBeneficiary(StoreTrainingBeneficiaryRequest $request, string $id)
     {

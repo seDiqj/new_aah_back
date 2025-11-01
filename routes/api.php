@@ -176,9 +176,10 @@ Route::prefix("community_dialogue_db")->name("community_dialogue_db.")->middlewa
     Route::get("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "showCD"])->middleware("permission:Dialogue.view");
     Route::get("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "showSession"])->middleware("permission:Dialogue.view");
     Route::post("/beneficiary", [CommunityDialogueDatabaseController::class, "storeBeneficiary"])->middleware("permission:Dialogue.create_beneficiary");
+    Route::post("/beneficiaries/toggle_presence/{id}", [CommunityDialogueDatabaseController::class, "togglePresence"])->middleware("permission:Dialogue.view");
     Route::post("/community_dialogue", [CommunityDialogueDatabaseController::class, "storeCommunityDialogue"])->middleware("permission:Dialogue.create");
     Route::post("/community_dialogue/session", [CommunityDialogueDatabaseController::class, "createNewSession"])->middleware("permission:Dialogue.create");
-    Route::post("/beneficiaries/add_community_dialogue", [CommunityDialogueDatabaseController::class, "addCommunityDialogueToBeneficiaries"])->middleware("permission:Dialogue.assign_community_dailogue");
+    Route::post("/beneficiaries/add_community_dialogue", [CommunityDialogueDatabaseController::class, "addCommunityDialogueToBeneficiaries"])->middleware("permission:Dialogue.assign");
     Route::put("/beneficiary/{id}", [CommunityDialogueDatabaseController::class, "updateBeneficiary"])->middleware("permission:Dialogue.edit");
     Route::put("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "updateCommunityDialogue"])->middleware("permission:Dialogue.edit");
     Route::put("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "updateSession"])->middleware("permission:Dialogue.edit");
@@ -231,6 +232,7 @@ Route::prefix("referral_db")->name("referral_db.")->middleware(["auth:sanctum"])
 Route::prefix("enact_database")->name("enact_database.")->middleware(["auth:sanctum"])->group(function () {
     Route::get("/", [EnactController::class, "index"]);
     Route::get("/assessments_list", [EnactController::class, "indexAssessmentsList"]);
+    Route::get("/show_for_profile/{id}", [EnactController::class, "showForProfile"]);
     Route::get("/{id}", [EnactController::class, "show"]);
     Route::post("/assess_assessment", [EnactController::class, "assessAssessment"]);
     Route::post("/", [EnactController::class, "store"]);
@@ -306,4 +308,15 @@ Route::prefix("filter")->name("filter.")->middleware("auth:sanctum")->group(func
     Route::post("/cd_database/beneficiaries", [FilterTablesController::class, "filterCdDbBnf"])->middleware("permission:Dialogue.view");
     Route::post("/psychoeducation_db/psychoeducations", [FilterTablesController::class, "filterPsychoeducations"])->middleware("permission:Psychoeducation.view");
     Route::post("/cd_database/cds", [FilterTablesController::class, "filterCds"])->middleware("permission:Dialogue.view");
+    Route::post("/training_database/trainings", [FilterTablesController::class, "filterTrainings"])->middleware("permission:Training.view");
+    Route::post("/training_database/beneficiaries", [FilterTablesController::class, "filterTrainingDatabaseBnf"])->middleware("permission:Training.view");
+    Route::post("/refferal_database/beneficiaries", [FilterTablesController::class, "filterRereralDatabaseBnf"])->middleware("permission:Training.view");
+    Route::post("/enact_database/enacts", [FilterTablesController::class, "filterEnacts"]);
+    Route::post("/users", [FilterTablesController::class, "filterUsers"])->middleware("permission:List User");
+    Route::post("/roles", [FilterTablesController::class, "filterRoles"])->middleware("permission:List Role");
+    Route::post("/permissions", [FilterTablesController::class, "filterPermissoins"])->middleware("permission:List Role");
+    Route::post("/submitted_databases", [FilterTablesController::class, "filterSubmittedDatabases"])->middleware("permission:List Role");
+    Route::post("/approved_databases", [FilterTablesController::class, "filterApprovedDatabases"])->middleware("permission:List Role");
+    Route::post("/reviewed_aprs", [FilterTablesController::class, "filterReviwedAprs"])->middleware("permission:List Role");
+    Route::post("/aprroved_aprs", [FilterTablesController::class, "filterApprovedAprs"])->middleware("permission:List Role");
 });

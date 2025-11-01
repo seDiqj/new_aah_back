@@ -106,7 +106,7 @@ class Beneficiary extends Model
             'beneficiary_community_dialogue_session',
             'beneficiary_id',
             'community_dialogue_session_id'
-        );
+        )->withPivot("isPresent");
     }
 
     public function groups ()
