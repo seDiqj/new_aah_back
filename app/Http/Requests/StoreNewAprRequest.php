@@ -25,8 +25,10 @@ class StoreNewAprRequest extends FormRequest
             "project_id" => "required|integer|exists:projects,id",
             "database_id" => "required|integer|exists:databases,id",
             "province_id" => "required|integer|exists:provinces,id",
+            "manager_id" => "required|integer|exists:users,id",
             "fromDate" => "required",
-            "toDate" => "required"
+            "toDate" => "required",
+            "comment" => "nullable|string",
         ];
     }
 }

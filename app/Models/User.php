@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Contracts\Role;
 use Spatie\Permission\Traits\HasRoles;
+use App\Models\User;
+
 
 class User extends Authenticatable
 {
@@ -50,20 +52,14 @@ class User extends Authenticatable
         'updated_at'
     ];
 
-
-
     protected $appends = ["created_date", "updated_date"];
 
     public function getCreatedDateAttribute() {
-
-        return $this->created_at->format("Y-m-d");
-
+    return $this->created_at ? $this->created_at->format("Y-m-d") : null;
     }
 
     public function getUpdatedDateAttribute() {
-
-        return $this->updated_at->format("Y-m-d");
-        
+        return $this->updated_at ? $this->updated_at->format("Y-m-d") : null;
     }
 
     protected function runSoftDelete()
@@ -100,6 +96,13 @@ class User extends Authenticatable
     public function permissionsRelation()
     {
         return $this->permissions();
+    }
+
+    public function notifications ()
+    {
+        return $this->belongsToMany(Notification::class)
+                                    ->withPivot('readAt')
+                                    ->withTimestamps();
     }
 
 }

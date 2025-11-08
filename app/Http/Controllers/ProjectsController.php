@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MessageSent;
 use App\Http\Requests\StoreNewAprRequest;
 use App\Http\Requests\StoreProjectRequest;
 use App\Models\Apr;
@@ -10,12 +11,15 @@ use App\Models\DatabaseProgramBeneficiary;
 use App\Models\Dessaggregation;
 use App\Models\Enact;
 use App\Models\Indicator;
+use App\Models\IndicatorType;
+use App\Models\Notification;
 use App\Models\Outcome;
 use App\Models\Output;
 use App\Models\Project;
 use App\Models\ProjectLogs;
 use App\Models\Province;
 use App\Models\Sector;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -34,7 +38,6 @@ class ProjectsController extends Controller
 
     public function indexProjectsThatHasAtleastOneIndicatorWhichBelongsToSpicificDatabase(string $databaseName)
     {
-        error_log("mosa");
         $database = Database::where("name", $databaseName)->first();
 
         if (!$database) {
@@ -301,8 +304,15 @@ class ProjectsController extends Controller
                     $indicator["provinces"] = Indicator::find($indicator["id"])->provinces;
                     $indicator["isp3"] = $indicator->isp3;
                     $indicator["database"] = Database::find($indicator["database_id"])->name;
+                    
+                    if ($indicator['database'] == "main_database" && $indicator->type_id)
+                        $indicator["type"] = IndicatorType::find($indicator->type_id)->type;
 
-                    unset($indicator["database_id"]);
+                    
+                    unset(
+                        $indicator["database_id"],
+                        $indicator["type_id"],
+                    );
 
                     $indicator["provinces"] = $indicator->provinces->map(function ($province) {
 
@@ -395,7 +405,17 @@ class ProjectsController extends Controller
             'reportingDate'    => 'required|string|max:255',
             'reportingPeriod'  => 'required|string|max:255',
             'description'      => 'nullable|string',
+            'provinces'        => 'required|array',
+            'provinces.*'      => 'exists:provinces,name',
+            'thematicSector'   => 'required|array',
+            'thematicSector.*' => 'exists:sectors,name'
         ]);
+
+        $provinceIds = Province::whereIn("name", $validated["provinces"])->pluck("id")->toArray();
+        $sectorIds = Sector::whereIn('name', $validated["thematicSector"])->pluck('id')->toArray();
+
+        $project->provinces()->sync($provinceIds);
+        $project->sectors()->sync($sectorIds);
 
         $project->update($validated);
 
@@ -549,30 +569,153 @@ class ProjectsController extends Controller
 
             case 'created':
                 $action = 'create';
+                $notification = Notification::create([
+                    "title" => "Project created",
+                    "message" => "A new project has been created check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $responsibleUsersForCommingSteps = User::permission("Project.submit")->get();
+
+                if ($responsibleUsersForCommingSteps->isEmpty()) return response()->json(["status" => false, "message" => "No user with the 'Project Submit' permission was found, so the system cannot notify anyone to forward the project."], 404);
+
+                foreach ($responsibleUsersForCommingSteps as $user) {
+                    $user->notifications()->attach($notification->id, ["readAt" => false]);
+                    event(new MessageSent($user->id, $notification->message));
+                }
                 break;
 
             case 'hodDhodApproved':
                 $action = 'submit';
+
+                $notification = Notification::create([
+                    "title" => "Project submitted",
+                    "message" => "A new project has been submitted check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $responsibleUsersForCommingSteps = User::permission("Project.grantFinalize")->get();
+
+                if ($responsibleUsersForCommingSteps->isEmpty()) return response()->json(["status" => false, "message" => "No user with the 'Project grant finalized' permission was found, so the system cannot notify anyone to forward the project."], 404);
+
+                foreach ($responsibleUsersForCommingSteps as $user) {
+                    $user->notifications()->attach($notification->id, ["readAt" => false]);
+                    event(new MessageSent($user->id, $notification->message));
+                }
                 break;
 
             case 'hodDhodRejected':
                 $action = 'rejectSubmit';
+
+                $projectCorrespondingLog = ProjectLogs::where("action", "create")->where("project_id", $project->id)->first();
+
+                if (!$projectCorrespondingLog) return response()->json(["status" => false, "message" => "The system could not find the current project log in submitted stage, so it can not notify anyone to check it !"]);
+
+                $creator = User::find($projectCorrespondingLog->user_id);
+
+                if (!$creator) return response()->json(["status" => false, "message" => "The system could not find the user that has created the project, so it can not notify anyone to check it !"]);
+
+                $notification = Notification::create([
+                    "title" => "Project rejected",
+                    "message" => "The project that you created has been rejected by " . Auth::user()->name . " check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $creator->notifications()->attach($notification->id, ["readAt" => false]);
+
+                event(new MessageSent($creator->id, $notification->message));
+
                 break;
 
             case 'grantFinalized':
                 $action = 'grantFinalize';
+
+                $notification = Notification::create([
+                    "title" => "Project grant finalized",
+                    "message" => "A new project has been finalized at the grant stage check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $responsibleUsersForCommingSteps = User::permission("Project.HQFinalize")->get();
+
+                if ($responsibleUsersForCommingSteps->isEmpty()) return response()->json(["status" => false, "message" => "No user with the 'Project HQ finalized' permission was found, so the system cannot notify anyone to forward the project."], 404);
+
+                foreach ($responsibleUsersForCommingSteps as $user) {
+                    $user->notifications()->attach($notification->id, ["readAt" => false]);
+                    event(new MessageSent($user->id, $notification->message));
+                }
+
                 break;
 
             case 'grantRejected':
                 $action = 'rejectGrant';
+
+                $projectCorrespondingLog = ProjectLogs::where("action", "submit")->where("project_id", $project->id)->first();
+
+                if (!$projectCorrespondingLog) return response()->json(["status" => false, "message" => "The system could not find the current project log in submitted stage, so it can not notify anyone to check it !"]);
+
+                $submitter = User::find($projectCorrespondingLog->user_id);
+
+                if (!$submitter) return response()->json(["status" => false, "message" => "The system could not find the user that has submitted the project, so it can not notify anyone to check it !"]);
+
+                $notification = Notification::create([
+                    "title" => "Project rejected",
+                    "message" => "The project that you submitted has been rejected by " . Auth::user()->name . " check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $submitter->notifications()->attach($notification->id, ["readAt" => false]);
+
+                event(new MessageSent($submitter->id, $notification->message));
+
                 break;
 
             case 'hqFinalized':
                 $action = 'hqFinalize';
+
+                $notification = Notification::create([
+                    "title" => "Project HQ finalized",
+                    "message" => "A new project has been finalized at the HQ stage check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $responsibleUsersForCommingSteps = User::permission("Project.HQFinalize")->get();
+
+                foreach ($responsibleUsersForCommingSteps as $user) {
+                    $user->notifications()->attach($notification->id, ["readAt" => false]);
+                    event(new MessageSent($user->id, $notification->message));
+                }
+
                 break;
 
             case 'hqRejected':
                 $action = 'rejectHq';
+
+                $projectCorrespondingLog = ProjectLogs::where("action", "grantFinalize")->where("project_id", $project->id)->first();
+
+                if (!$projectCorrespondingLog) return response()->json(["status" => false, "message" => "The system could not find the current project log in grant finalize stage, so it can not notify anyone to check it !"]);
+
+                $grantFinalizer = User::find($projectCorrespondingLog->user_id);
+
+                if (!$grantFinalizer) return response()->json(["status" => false, "message" => "The system could not find the user that has finalized at the grant stage the project, so it can not notify anyone to check it !"]);
+
+                $notification = Notification::create([
+                    "title" => "Project rejected",
+                    "message" => "The project that you finalized at the grant stage has been rejected by " . Auth::user()->name . " check it now !",
+                    "type" => "project",
+                    "project_id" => $project->id
+                ]);
+
+                $grantFinalizer->notifications()->attach($notification->id, ["readAt" => false]);
+
+                event(new MessageSent($grantFinalizer->id, $notification->message));
+
                 break;
 
             default:

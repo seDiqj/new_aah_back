@@ -39,9 +39,30 @@ class CommunityDialogueDatabaseController extends Controller
 
     public function indexCommunityDialogues ()
     {
-        $communityDialogues = CommunityDialogue::all();
+        $communityDialogues = CommunityDialogue::with('program')->get();
 
         if ($communityDialogues->isEmpty()) return response()->json(["status" => false, "message" => "No community dialogue was found !"], 404);
+
+        $communityDialogues = $communityDialogues->map(function ($cd) {
+            $cd->projectCode = Project::find($cd->program->project_id)->projectCode;
+            $cd->province = Province::find($cd->program->province_id)->name;
+            $cd->district = District::find($cd->program->district_id)->name;
+            $cd->indicator = Indicator::find($cd->indicator_id)->indicatorRef;
+            $cd->village = $cd->program->village;
+            $cd->focalPoint = $cd->program->focalPoint;
+            $cd->numOfSessions = $cd->sessions->count();
+            $cd->numOfGroups = $cd->groups->count();
+
+            unset(
+                $cd['program'],
+                $cd['indicator_id'],
+                $cd['sessions'],
+                $cd['groups'],
+                $cd['program_id'],
+            );
+
+            return $cd;
+        });
 
         return response()->json(["status" => true, "message" => "", "data" => $communityDialogues]);
     }
@@ -175,7 +196,7 @@ class CommunityDialogueDatabaseController extends Controller
 
     }
 
-    public function showCommunityDialogue($id)
+    public function showCommunityDialogue(string $id)
     {
         $communityDialogue = CommunityDialogue::with(['program', 'sessions', 'groups'])
             ->find($id);
@@ -189,14 +210,16 @@ class CommunityDialogueDatabaseController extends Controller
 
         $communityDialogue->program->indicator_id = $communityDialogue->indicator_id;
 
-        return response()->json([
-            "status" => true,
-            "data" => [
+        $finalData = [
                 "programInformation" => $communityDialogue->program,
                 "sessions" => $communityDialogue->sessions,
                 "groups" => $communityDialogue->groups,
                 "remark" => $communityDialogue->remark,
-            ]
+        ];
+
+        return response()->json([
+            "status" => true,
+            "data" => $finalData
         ], 200);
     }
 
@@ -316,14 +339,42 @@ class CommunityDialogueDatabaseController extends Controller
         ]);
 
         $sessions = $request->input("sessions", []);
-        $communityDialogue->sessions()->delete();
-        foreach ($sessions as $session) {
-            $communityDialogue->sessions()->create($session);
+        $newSessions = [];
+        foreach ($sessions as $session) {            
+            if ($session['id']) {
+                $sessionFromDb = CommunityDialogueSession::find($session["id"]);
+                if (!$sessionFromDb) continue;
+                unset($session["id"]);
+                $sessionFromDb->update($session);
+                continue;
+            }
+            unset($session["id"]);
+            $createdSession = $communityDialogue->sessions()->create($session);
+            array_push($newSessions, $createdSession);
         }
 
+        // $communityDialogueBeneficiaries = $communityDialogue->beneficiaries;
+
+
+        // foreach ($communityDialogueBeneficiaries as $bnf) {
+        //     foreach ($newSessions as $session) {
+        //             $bnf->communityDialogueSessions()->create([
+        //             'community_dialogue_session_id' => $session->id,
+        //             'beneficiary_id' => $bnf->id,
+        //             'isPresent' => true
+        //         ]);
+        //     }
+        // }
+
         $groups = $request->input("groups", []);
-        $communityDialogue->groups()->delete();
         foreach ($groups as $group) {
+            if ($group['id']) {
+                $groupFromDb = Group::find($group['id']);
+                if (!$groupFromDb) continue;
+                unset($group['id']);
+                $groupFromDb->update($group);
+                continue;
+            }
             $communityDialogue->groups()->create($group);
         }
 

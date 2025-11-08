@@ -10,8 +10,6 @@ use App\Models\Project;
 use App\Models\Province;
 use App\Models\Question;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 class EnactController extends Controller
 {

@@ -551,6 +551,10 @@ class FilterTablesController extends Controller
                 'province' => $cd->program->province->name ?? null,
                 'indicator' => $cd->indicator->indicatorRef ?? null,
                 'remark' => $cd->remark,
+                'numOfSessions' => $cd->sessions->count(),
+                'numOfGroups' => $cd->groups->count(),
+                'village' => $cd->program->village,
+                'district' => $cd->program->district->name,
             ];
         })->values();
 
@@ -888,6 +892,7 @@ class FilterTablesController extends Controller
             "data" => $aprs
         ]);
     }
+
     public function filterApprovedDatabases (Request $request)
     {
         $query = Apr::query()->where("status", "firstApproved")->orWhere("status", );
@@ -940,6 +945,7 @@ class FilterTablesController extends Controller
             "data" => $aprs
         ]);
     }
+
     public function filterReviwedAprs (Request $request)
     {
         $query = Apr::query()->where("status", "secondRejected")->orWhere("status", "firstApproved");
@@ -992,6 +998,7 @@ class FilterTablesController extends Controller
             "data" => $aprs
         ]);
     }
+
     public function filterApprovedAprs (Request $request)
     {
         $query = Apr::query()->where("status", "reviewed")->orWhere("status", "secondApproved");

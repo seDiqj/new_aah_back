@@ -24,12 +24,20 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Isp3Controller;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ChatMessageController;
 use App\Models\Enact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
 Route::get("/test/{project_id}/{database_id}/{province_id}/{fromDate}/{endDate}", [AprGeneratorController::class, "generate"]);
+
+Route::post('/send-message', [ChatMessageController::class, 'store']);
+
+Route::post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+});
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -68,6 +76,8 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
     // Beneficiary
     Route::post("/beneficiary/change_apr_included/{id}", [GlobalController::class, "changeBeneficiaryAprIncluded"]);
 
+    // managers
+    Route::get("/managers", [GlobalController::class, "indexManagers"]);
 });
 
 Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->group(function () {
@@ -282,20 +292,24 @@ Route::prefix("departments")->name("departments.")->middleware(["auth"])->group(
 
 // permission done needs full review
 Route::prefix("db_management")->name("db_management.")->middleware("auth:sanctum")->group(function () {
-    Route::get("/submitted_databases", [DatabaseController::class, "indexSubmittedDatabases"])->middleware("permission:Database_submission.view");
+    Route::get("/submitted_databases", [DatabaseController::class, "indexSubmittedAndFirstRejectedDatabases"])->middleware("permission:Database_submission.view");
+    Route::get("/first_approved_and_second_rejected_databases", [DatabaseController::class, "indexFirstApprovedAndSecondRejectedDatabases"])->middleware("permission:Database_submission.view");
     Route::get("/first_approved_databases", [DatabaseController::class, "indexFirstApprovedDatabases"])->middleware("permission:Database_submission.view");
     Route::get("/show_database/{id}", [DatabaseController::class, "showSubmittedDatabase"])->middleware("permission:Database_submission.view");
     Route::post("/change_db_status/{id}", [DatabaseController::class, "changeDatabaseStatus"])->middleware("permission:Database_submission.view");
     Route::post("/submit_new_database", [DatabaseController::class, "submitNewDatabase"])->middleware("permission:Database_submission.create");
     Route::post("/deleted_submitted_databases", [DatabaseController::class, "destroySubmittedDatabases"])->middleware("permission:Database_submission.delete");
-    Route::post("/deleted_first_approved_databases", [DatabaseController::class, "destroyFirstApprovedDatabases"])->middleware("permission:Database_submission.delete");
 });
 
 // permission done needs full review
 Route::prefix("apr_management")->name("apr_management.")->middleware("auth:sanctum")->group(function () {
+    Route::get("/reviewed_aprs", [AprController::class, "indexReviewedAprs"])->middleware("permission:Apr.review");
     Route::get("/show_apr/{id}", [AprController::class, "showGeneratedApr"])->middleware("permission:Apr.review");
     Route::get("/get_system_aprs_status", [AprController::class, "getSystemAprsStatus"])->middleware("permission:Apr.view/list");
+    Route::post("/mark_apr_as_reviewed/{id}", [AprController::class, "markAprAsReviewed"])->middleware("permission:Apr.mark_as_reviewed");
     Route::post("/generate_apr/{id}", [AprController::class, "generateApr"])->middleware("permission:Database_submission.generate_apr");
+    Route::post("/reject_in_review_stage/{id}", [AprController::class, "rejectAprInReviewStage"]);
+    Route::post("/approve_apr/{id}", [AprController::class, "approveApr"])->middleware("permission:Apr.validate");
 });
 
 // Permissions done
@@ -319,4 +333,9 @@ Route::prefix("filter")->name("filter.")->middleware("auth:sanctum")->group(func
     Route::post("/approved_databases", [FilterTablesController::class, "filterApprovedDatabases"])->middleware("permission:List Role");
     Route::post("/reviewed_aprs", [FilterTablesController::class, "filterReviwedAprs"])->middleware("permission:List Role");
     Route::post("/aprroved_aprs", [FilterTablesController::class, "filterApprovedAprs"])->middleware("permission:List Role");
+});
+
+Route::prefix("notification")->name("filter.")->middleware("auth:sanctum")->group(function () {
+    Route::get("my_notifications/{id}", [NotificationController::class, "indexUserNotifications"]);
+    Route::post("/mark_as_read/{id}", [NotificationController::class, "markNotificationAsRead"]);
 });

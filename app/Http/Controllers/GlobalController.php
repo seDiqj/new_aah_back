@@ -7,6 +7,7 @@ use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
+use App\Models\User;
 use App\Models\Beneficiary;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,16 @@ class GlobalController extends Controller
     public function indexBeneficiaryIndicators(string $id) {}
 
     public function indexDatabasePrograms(string $db) {}
+
+    public function indexManagers ()
+    {
+        $usersWithRoleManager = User::role("manager")->select("id", "name")->get();
+
+        if ($usersWithRoleManager->isEmpty()) 
+            return response()->json(["status" => false, "message" => "No user with role manager was found !"], 404);
+
+        return response()->json(["status" => true, "message" => "", "data" => $usersWithRoleManager]);
+    }
 
     public function indexDatabaseIndicators(string $databaseName) {
 

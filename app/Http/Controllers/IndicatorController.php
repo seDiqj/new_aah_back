@@ -12,7 +12,6 @@ use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Helpers\LogHelpers;
 
 class IndicatorController extends Controller
 {
@@ -288,22 +287,6 @@ class IndicatorController extends Controller
             ]
         ], 200);
     }
-
-
-    // public function destroy(Request $request) {
-
-    //     $ids = $request->input("ids");
-
-    //     $request->validate([
-    //         "ids" => "required|array",
-    //         "ids.*" => "intager",
-    //     ]);
-
-    //     Indicator::whereIn("id", $ids)->delete();
-
-    //     return response()->json(["status" => true, "message" => "Indicators successfully deleted !"], 200);
-
-    // }
 
 
     public function destroy($id)

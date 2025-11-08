@@ -53,8 +53,9 @@ class OutputController extends Controller
     public function update(Request $request, string $id)
     {
         $output = Output::find($id);
-
+        
         if (!$output) return response()->json(["status" => false, "message" => "No such output in database !"], 404);
+
 
         $validated = $request->validate([
             "output" => "required|string",

@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOutcomeRequest;
 use App\Models\Outcome;
-use App\Models\Project;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class OutcomeController extends Controller
 {

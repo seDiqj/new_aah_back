@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Helpers\LogHelpers;
 use App\Models\Beneficiary;
 use App\Models\Database;
 use App\Models\Dessaggregation;
@@ -15,7 +14,6 @@ use App\Models\Training;
 use App\Traits\AprToolsTrait;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Log;
 
 class AprGeneratorController extends Controller
 {
@@ -101,7 +99,6 @@ class AprGeneratorController extends Controller
                     // }
         
                 } elseif ($indicator->dessaggregationType === 'session') {
-                    // مجموع communityDialogueSessions برای همه beneficiaries
                     $achieved = $beneficiaries->reduce(function ($total, $b) use ($indicator) {
                         if ($b->indicators->contains('id', $indicator->id)) {
                             $total += $b->communityDialogueSessions->count();
@@ -214,29 +211,29 @@ class AprGeneratorController extends Controller
                 ->with('assessments')
                 ->get();
 
-            $numberOfEnactsPerMonth = array_fill(0, 12, 0);
+            $numberOfAssessmentsPerMonth = array_fill(0, 12, 0);
             $scoresPerMonth = array_fill(0, 12, 0);
 
             
             foreach ($projectIndicators as $indicator) {
                 
-                $achieved = $enacts->reduce(function ($carry, $enact) use ($indicator, &$numberOfEnactsPerMonth, &$scoresPerMonth) {
-                    if ($enact->indicator_id == $indicator->id && $enact->aprIncluded)  {
+                $achieved = 0;
 
-                        $monthIndex = (int) Carbon::parse($enact->date)->format("n") - 1;
+                $enacts->map(function ($enact) use ($indicator, &$numberOfAssessmentsPerMonth, &$scoresPerMonth, &$achieved) {
+                    $achieved += $enact->assessments->reduce(function ($carry, $assessment) use ($indicator, &$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
+                        if ($assessment->enact->indicator_id == $indicator->id && $assessment->enact->aprIncluded)  {
 
-                        $numberOfEnactsPerMonth[$monthIndex]++;
+                            $monthIndex = (int) Carbon::parse($assessment->date)->format("n") - 1;
 
-                        $scoresPerMonth[$monthIndex] += $enact->assessments->reduce(function ($carry, $assessment) {
+                            $numberOfAssessmentsPerMonth[$monthIndex]++;
 
-                            return $carry + $assessment->totalScore;
+                            $scoresPerMonth[$monthIndex] += $assessment->totalScore;
 
-                        });
-
-                        return $carry + 1;
-                    }
-                    return $carry;
-                }, 0);
+                            return $carry + 1;
+                        }
+                        return $carry;
+                    }, 0);
+                });
         
                 $indicator->achived_target = $achieved;
                 $indicator->save();
@@ -248,7 +245,7 @@ class AprGeneratorController extends Controller
 
                 if ($dessaggregations->isEmpty()) continue;
 
-                $dessaggregations->map(function ($dessaggregation) use (&$numberOfEnactsPerMonth, &$scoresPerMonth) {
+                $dessaggregations->map(function ($dessaggregation) use (&$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
 
                     $dessaggregationFromDb = Dessaggregation::where("id", $dessaggregation["id"])->first();
 
@@ -257,8 +254,8 @@ class AprGeneratorController extends Controller
                     switch ($dessaggregation->description) {
                         case '# of supervised psychosocial counsellors':
 
-                            $dessaggregationFromDb->months = $numberOfEnactsPerMonth;
-                            $dessaggregationFromDb->achived_target = (collect(...$numberOfEnactsPerMonth))->reduce(function ($carry, $item) {
+                            $dessaggregationFromDb->months = $numberOfAssessmentsPerMonth;
+                            $dessaggregationFromDb->achived_target = (collect(...$numberOfAssessmentsPerMonth))->reduce(function ($carry, $item) {
                                 return $carry + $item;
                             }, 0); 
                             $dessaggregationFromDb->save();
@@ -471,20 +468,18 @@ class AprGeneratorController extends Controller
         $province = Province::find($provinceId);
         if (!$province) return response()->json(["status" => false, "message" => "No such province in system!"], 404);
 
-        // indicatorهای مربوط به این database
         $projectIndicators = $this->projectIndicatorsToASpicificDatabase($project, $databaseId);
 
         $finalAPR = [
             "impact" => $project->projectGoal,
             "outcomes" => $project->outcomes->map(function ($outcome) use ($projectIndicators) {
-                // outputsی که حداقل یک indicator مرتبط دارند
                 $filteredOutputs = $outcome->outputs->filter(function ($output) use ($projectIndicators) {
                     $hasIndicator = $projectIndicators->where('output_id', $output->id)->isNotEmpty();
                     return $hasIndicator;
                 });
 
                 if ($filteredOutputs->isEmpty()) {
-                    return null; // اگر هیچ output مرتبطی نیست، این outcome را حذف می‌کنیم
+                    return null;
                 }
 
                 return [
@@ -511,7 +506,7 @@ class AprGeneratorController extends Controller
                         ];
                     })->values()->toArray(),
                 ];
-            })->filter()->values()->toArray(), // outcomes خالی را حذف می‌کنیم
+            })->filter()->values()->toArray(),
         ];
 
         return response()->json([
@@ -519,7 +514,6 @@ class AprGeneratorController extends Controller
             "data" => $finalAPR
         ]);
     }
-
 
     /**
      * Update dessaggregation targets based on beneficiaries collection.
@@ -663,25 +657,30 @@ class AprGeneratorController extends Controller
             $monthIndex = (int) Carbon::parse($psychoeducation->awarenessDate)->format("n") - 1;
 
 
-            $numberOfMenAbove18 = (int) $psychoeducation->ofMenHostCommunity ?? 0 + (int)
-                                        $psychoeducation->ofMenIdp ?? 0 + (int)
-                                        $psychoeducation->ofMenRefugee ?? 0 + (int)
-                                        $psychoeducation->ofMenReturnee ?? 0;
+            $numberOfMenAbove18 = 
+                ((int) ($psychoeducation->ofMenHostCommunity ?? 0)) +
+                ((int) ($psychoeducation->ofMenIdp ?? 0)) +
+                ((int) ($psychoeducation->ofMenRefugee ?? 0)) +
+                ((int) ($psychoeducation->ofMenReturnee ?? 0));
 
-            $numberOfWomenAbove18 = (int) $psychoeducation->ofWomenHostCommunity ?? 0 + (int)
-                                          $psychoeducation->ofWomenIdp ?? 0 + (int)
-                                          $psychoeducation->ofWomenRefugee ?? 0 + (int)
-                                          $psychoeducation->ofWomenReturnee ?? 0;
+            $numberOfWomenAbove18 = 
+                ((int) ($psychoeducation->ofWomenHostCommunity ?? 0)) +
+                ((int) ($psychoeducation->ofWomenIdp ?? 0)) +
+                ((int) ($psychoeducation->ofWomenRefugee ?? 0)) +
+                ((int) ($psychoeducation->ofWomenReturnee ?? 0));
 
-            $numberOfMenUnder18 = (int) $psychoeducation->ofBoyHostCommunity ?? 0 + (int)
-                                        $psychoeducation->ofBoyIdp ?? 0 + (int)
-                                        $psychoeducation->ofBoyRefugee ?? 0 + (int)
-                                        $psychoeducation->ofBoyReturnee ?? 0;
+            $numberOfMenUnder18 = 
+                ((int) ($psychoeducation->ofBoyHostCommunity ?? 0)) +
+                ((int) ($psychoeducation->ofBoyIdp ?? 0)) +
+                ((int) ($psychoeducation->ofBoyRefugee ?? 0)) +
+                ((int) ($psychoeducation->ofBoyReturnee ?? 0));
 
-            $numberOfWomenUnder18 = (int) $psychoeducation->ofGirlHostCommunity ?? 0 + (int)
-                                          $psychoeducation->ofGirlIdp ?? 0 + (int)
-                                          $psychoeducation->ofGirlRefugee ?? 0 + (int)
-                                          $psychoeducation->ofGirlReturnee ?? 0;
+            $numberOfWomenUnder18 = 
+                ((int) ($psychoeducation->ofGirlHostCommunity ?? 0)) +
+                ((int) ($psychoeducation->ofGirlIdp ?? 0)) +
+                ((int) ($psychoeducation->ofGirlRefugee ?? 0)) +
+                ((int) ($psychoeducation->ofGirlReturnee ?? 0));
+
 
 
             $demographicMonthDate["Of Male (above 18)"][$monthIndex] += $numberOfMenAbove18;

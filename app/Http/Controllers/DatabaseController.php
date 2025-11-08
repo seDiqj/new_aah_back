@@ -7,16 +7,22 @@ use App\Models\Apr;
 use App\Models\Database;
 use App\Models\Project;
 use App\Models\Province;
+use App\Models\User;
+use App\Models\Notification;
 use App\Traits\AprToolsTrait;
 use Illuminate\Http\Request;
+use App\Events\MessageSent;
+use App\Models\AprLog;
+use Illuminate\Support\Facades\Auth;
+
 
 class DatabaseController extends Controller
 {
     use AprToolsTrait;
 
-    public function indexSubmittedDatabases ()
+    public function indexSubmittedAndFirstRejectedDatabases ()
     {
-        $submittedDatabases = Apr::where("status", "submitted")->get();
+        $submittedDatabases = Apr::where("status", "submitted")->orWhere("status", "firstRejected")->get();
 
         if (!$submittedDatabases) return response()->json(["status" => false, "message" => "No submitted databases found !"], 404);
 
@@ -36,11 +42,32 @@ class DatabaseController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $submittedDatabases]);
     }
 
+    public function indexFirstApprovedAndSecondRejectedDatabases ()
+    {
+        $firstApprovedOrSecondRejectedDatabases = Apr::where("status", "firstApproved")->orWhere("status", "secondRejected")->get();
+
+        if ($firstApprovedOrSecondRejectedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" or "second rejected" stages!', 'data' => []], 404);
+
+        $firstApprovedOrSecondRejectedDatabases->map(function ($database) {
+
+            $database["projectCode"] = Project::find($database["project_id"])->projectCode;
+            $database["province"] = Province::find($database["province_id"])->name;
+            $database["database"] = Database::find($database["database_id"])->name;
+
+            unset($database["project_id"], $database["database_id"], $database["province_id"]);
+
+            return $database;
+
+        });
+
+        return response()->json(["status" => true, "message" => "", "data" => $firstApprovedOrSecondRejectedDatabases]);
+    }
+
     public function indexFirstApprovedDatabases ()
     {
         $approvedDatabases = Apr::where("status", "firstApproved")->get();
 
-        if ($approvedDatabases->isEmpty()) return response()->json(["status" => false, "message" => "No submitted databases found !"], 404);
+        if ($approvedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" stage!', "data" => []], 404);
 
         $approvedDatabases->map(function ($approvedDatabase) {
 
@@ -60,6 +87,8 @@ class DatabaseController extends Controller
     public function showSubmittedDatabase (string $id)
     {
         $submittedDatabase = Apr::find($id);
+
+        if (!$submittedDatabase) return response()->json(["status" => false, "message" => "No such database in system !"], 404);
 
         $project = Project::find($submittedDatabase->project_id);
 
@@ -113,38 +142,87 @@ class DatabaseController extends Controller
         return response()->json(["status" => true, "message" => "Selected databases successfully removed from submitted list !"], 200);
     }
 
-    public function destroyFirstApprovedDatabases (Request $request)
+    public function changeDatabaseStatus(Request $request, string $id)
     {
         $validated = $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "required|integer",
+            "newStatus" => "required|in:firstApproved,firstRejected",
         ]);
 
-        $ids = $validated["ids"];
-
-        Apr::whereIn("id", $ids)->delete();
-
-        return response()->json(["status" => true, "message" => "Selected databases successfully removed from approved list !"], 200);
-    }
-
-    public function changeDatabaseStatus (Request $request, string $id)
-    {
         $apr = Apr::find($id);
 
-        if (!$apr) return response()->json(["status" => false, "message" => "No such submitted apr in system !"], 404);
+        if (!$apr) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such APR found in the system.",
+            ], 404);
+        }
 
-        $validated = $request->validate(
-            [
-                "newStatus" => "in:submitted,firstApproved,firstRejecte,reviewed,secondApproved,secondRejected"
-            ]
-        );
+        $approver = User::find(Auth::id());
+        $approverName = $approver ? $approver->name : 'Unknown user';
+
+        $responsibleUsersForCommingStep = User::permission('Database_submission.view')->get();
+
+        if ($responsibleUsersForCommingStep->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "The system cannot update the APR status because there is no available user with the role HoD, DHoD, or FM to forward the APR.",
+            ]);
+        }
 
         $apr->status = $validated["newStatus"];
         $apr->save();
 
-        $messageHelperWord = $validated["newStatus"] == "firstApproved" ? "Approved" : "Rejected";
+        AprLog::create([
+            "apr_id" => $apr->id,
+            "user_id" => Auth::id(),
+            "action" => $validated["newStatus"],
+            "comment" => $validated["comment"] ?? null
+        ]);
 
-        return response()->json(["status" => true, "message" => "Apr status changed to $messageHelperWord"], 200);
+        $isApproved = $validated["newStatus"] === "firstApproved";
+
+        $notificationTitle = $isApproved
+            ? "Database Approved"
+            : "Database Rejected";
+
+        $notificationMessage = $isApproved
+            ? "A new database has been approved. Please review it."
+            : "The database you submitted has been rejected by {$approverName}.";
+
+        $notification = Notification::create([
+            "title"   => $notificationTitle,
+            "message" => $notificationMessage,
+            "type"    => "submittedDatabase",
+            "apr_id"  => $apr->id,
+        ]);
+
+        if ($validated["newStatus"] == "firstApproved")
+            foreach ($responsibleUsersForCommingStep as $user) {
+                $user->notifications()->attach($notification->id, ['readAt' => false]);
+                event(new MessageSent($user->id, $notificationMessage));
+            }
+        else {
+
+            $correspondingAprLogInSubmitStage = AprLog::where("action", "submitted")->where("apr_id", $apr->id)->first();
+
+            if (!$correspondingAprLogInSubmitStage)
+                return response()->json(["status" => false, "message" => "Warning: The system could not find selected apr log in submitted stage so it can not notify anyone to check it !"]);
+
+            $submitter = User::find($correspondingAprLogInSubmitStage->user_id);
+
+            if (!$submitter)
+                return response()->json(["status" => false, "message" => "Warning: The system could not find selected apr submitter, so it can not notify anyone to check it !"]);
+            $submitter->notifications()->attach($notification->id, ['readAt' => false]);
+            event(new MessageSent($submitter->id, $notificationMessage));
+
+        }
+
+        $messageHelperWord = $isApproved ? "Approved" : "Rejected";
+
+        return response()->json([
+            "status"  => true,
+            "message" => "APR status changed to {$messageHelperWord}.",
+        ], 200);
     }
 
     public function submitNewDatabase (StoreNewAprRequest $request)
@@ -169,7 +247,33 @@ class DatabaseController extends Controller
 
         if ($exist) return response()->json(["status" => true, "message" => "Selected database has been previosly submitted !"], 200);
 
-        Apr::create($validated);
+        $createdDatabase = Apr::create($validated);
+
+        $selectedManagerId = $validated["manager_id"];
+
+        $manager = User::find($selectedManagerId);
+
+        $notification = Notification::create([
+            "title" => "New database submitted !",
+            "message" => "A new database has been submitted check it now !",
+            "type" => "submittedDatabase",
+            "apr_id" => $createdDatabase->id
+        ]);
+
+        $manager->notifications()->attach($notification->id, ['readAt' => false]);
+
+        event(new MessageSent($selectedManagerId, 
+        
+        "New database submitted !"
+    
+        ));
+
+        AprLog::create([
+            "apr_id" => $createdDatabase->id,
+            "user_id" => Auth::id(),
+            "action" => "submitted",
+            "comment" => $validated["comment"] ?? null
+        ]);
 
         return response()->json(["status" => true, "message" => "New database successfully submitted !"], 200);
     }
