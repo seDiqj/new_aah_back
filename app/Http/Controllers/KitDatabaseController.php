@@ -7,7 +7,6 @@ use App\Http\Requests\StoreKitDistributionRequest;
 use App\Http\Requests\StoreKitForBeneficiaryRequest;
 use App\Models\Beneficiary;
 use App\Models\Database;
-use App\Models\DatabaseProgramBeneficiary;
 use App\Models\District;
 use App\Models\Indicator;
 use App\Models\Kit;
@@ -16,8 +15,6 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
-
-use function PHPSTORM_META\map;
 
 class KitDatabaseController extends Controller
 {
@@ -110,7 +107,8 @@ class KitDatabaseController extends Controller
         
     }
 
-    public function storeBeneficiary(StoreBeneficiaryRequest $request) {
+    public function storeBeneficiary(StoreBeneficiaryRequest $request) 
+    {
 
         if (!($request->input("program") || $request->input("indicators"))) 
             return response()->json(["status" => false, "message" => "Please select a valid indicator / program", "data" => $request->all()], 422);

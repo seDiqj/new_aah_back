@@ -14,7 +14,7 @@ class StoreTrainingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'projectCode'    => 'required|string|exists:projects,projectCode',
+            'project_id'    => 'required|exists:projects,id',
             'province'   => 'required|string|exists:provinces,name',
             'district'   => 'required|string|exists:districts,name',
             'indicator'  => 'required|string|exists:indicators,indicator',

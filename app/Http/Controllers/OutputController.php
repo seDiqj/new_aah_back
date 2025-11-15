@@ -24,38 +24,42 @@ class OutputController extends Controller
 
     }
 
-    public function store(Request $request) {
+    public function store(StoreOutputRequest $request) {
 
         $validated = $request->all();
 
-        $createdOutputs = [];
+        $corespondingOutcome = Outcome::find($validated["outcomeId"]);
 
-        foreach ($validated["outputs"] as $output) {
+        if (!$corespondingOutcome) return response()->json(["status" => false, "message" => "Selected outcome is not yet saved in database !"], 422);
 
-            $corespondingOutcome = Outcome::find($output["outcomeId"]);
+        $validated["outcome_id"] = $corespondingOutcome->id;
 
-            if (!$corespondingOutcome) return response()->json(["status" => false, "message" => "The output with name " . $output["output"] . " has no valid outcome referance"], 422);
+        $createdOutput = Output::create($validated);
 
-            $output["outcome_id"] = $corespondingOutcome->id;
-
-            $createdOutput = Output::create($output);
-
-            array_push($createdOutputs, [
-                "id" => $createdOutput->id,
-                "outputRef" => $createdOutput->outputRef,
-            ]);
-        }
-
-        return response()->json(["status" => true, "message" => "Outputs successfully saved !", "data" => $createdOutputs], 200);
+        return response()->json(["status" => true, "message" => "Output successfully saved !", "data" => $createdOutput], 200);
 
     }
+
+    public function show (string $id)
+    {
+        $output = Output::find($id);
+        
+        if (!$output) return response()->json(["status" => false, "message" => "No such output in system !"], 404);
+
+        $output["outcomeId"] = $output->outcome_id;
+        unset(
+            $output["created_at"],
+            $output["updated_at"],
+        );
+
+        return response()->json(["status" => true, "message" => "", "data" => $output], 200);
+    } 
 
     public function update(Request $request, string $id)
     {
         $output = Output::find($id);
         
         if (!$output) return response()->json(["status" => false, "message" => "No such output in database !"], 404);
-
 
         $validated = $request->validate([
             "output" => "required|string",

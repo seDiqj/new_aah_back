@@ -80,6 +80,17 @@ class GlobalController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $projects]);
     }
 
+    public function indexProjectProvinces (string $id)
+    {
+        $project = Project::find($id);
+
+        if (!$project) return response()->json(["status" => false, "message" => "No such project in system !"], 404);
+
+        $provinces = $project->provinces()->select("id", "name")->get();
+
+        return response()->json(["status" => true, "message" => "", "data" => $provinces], 200);
+    }
+
     public function changeBeneficiaryAprIncluded (string $id)
     {
         $beneficiary = Beneficiary::find($id);

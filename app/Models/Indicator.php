@@ -40,17 +40,11 @@ class Indicator extends Model
         return $this->belongsTo(Output::class);
     }
 
-    /**
-     * Sub-indicators
-     */
     public function subIndicator()
     {
         return $this->hasMany(Indicator::class, 'parent_indicator');
     }
 
-    /**
-     * Parent indicator
-     */
     public function parent()
     {
         return $this->belongsTo(Indicator::class, 'parent_indicator');
@@ -81,6 +75,11 @@ class Indicator extends Model
     public function isp3 ()
     {
         return $this->belongsToMany(Isp3::class);
+    }
+
+    public function type ()
+    {
+        return $this->belongsTo(IndicatorType::class);
     }
 }
 

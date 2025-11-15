@@ -21,7 +21,7 @@ class IndicatorController extends Controller
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in system"], 404);
 
-        $indicators = $project->indicators;
+        $indicators = $project->indicators()->where("parent_indicator", "==", null)->get();
 
         if ($indicators->isEmpty()) return response()->json(["status" => false, "message" => "No indicator was found for this project !"], 404);
 
@@ -31,109 +31,99 @@ class IndicatorController extends Controller
 
     public function store(Request $request)
     {
-        $indicators = $request->input('indicators');
-
-        if (!is_array($indicators)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Indicators data must be an array.'
-            ], 422);
-        }
+        $indicator = $request->input('indicator');
 
         $createdIndicators = [];
 
-        foreach ($indicators as $indicator) {
+        if (!is_array($indicator)) return response()->json(["status" => false, "message" => "Invalid indicator data !"], 422);
+        
+        $output = Output::find($indicator["outputId"]);
 
-            if (!is_array($indicator)) continue;
-            
-            $output = Output::find($indicator["outputId"]);
+        if (!$output) return response()->json(["status" => false, "message" => "Invalid output ref for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
 
-            if (!$output) return response()->json(["status" => false, "message" => "Invalid output ref for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
+        $database = Database::where("name", $indicator["database"])->first();
+        if (!$database) return response()->json(["status" => false, "message" => "Invalid database for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
 
-            $database = Database::where("name", $indicator["database"])->first();
-            if (!$database) return response()->json(["status" => false, "message" => "Invalid database for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
+        $typeId = null;
+        if (!empty($indicator["type"])) {
+            $dbType = IndicatorType::where("type", $indicator["type"])->first();
+            if (!$dbType) return response()->json(["status" => false, "message" => "Invalid type selected for indicator with reference " . $indicator["indicatorRef"]], 404);
+            $typeId = $dbType->id;
+        }
 
-            $typeId = null;
-            if (!empty($indicator["type"])) {
-                $dbType = IndicatorType::where("type", $indicator["type"])->first();
-                if (!$dbType) return response()->json(["status" => false, "message" => "Invalid type selected for indicator with reference " . $indicator["indicatorRef"]], 404);
-                $typeId = $dbType->id;
-            }
+        $main = Indicator::create([
+            'output_id' => $output->id,
+            'database_id' => $database->id,
+            'type_id' => $typeId,
+            'indicator' => $indicator['indicator'],
+            'indicatorRef' => $indicator['indicatorRef'],
+            'target' => $indicator['target'],
+            'achived_target' => 0,
+            'status' => $indicator['status'],
+            'dessaggregationType' => $indicator['dessaggregationType'],
+            'description' => $indicator['description'],
+            'parent_indicator' => null,
+        ]);
 
-            $main = Indicator::create([
+        array_push($createdIndicators, [
+            "id" => $main->id,
+            "indicatorRef" => $main->indicatorRef
+        ]);
+
+        $provincesDetails = $indicator["provinces"] ?? [];
+        $provincesNames = collect($provincesDetails)->pluck('province')->toArray();
+        $provincesIds = Province::whereIn("name", $provincesNames)->pluck("id", "name")->toArray();
+        
+        $finalProvincesData = [];
+        foreach ($provincesDetails as $provinceData) {
+            $provinceName = strtolower($provinceData["province"]);
+            if (!isset($provincesIds[$provinceName])) continue;
+            $finalProvincesData[$provincesIds[$provinceName]] = [
+                "target" => $provinceData["target"],
+                "achived_target" => 0,
+                "councilorCount" => $provinceData["councilorCount"]
+            ];
+        }
+
+        
+
+        $main->provinces()->sync($finalProvincesData);
+
+        if (!empty($indicator['subIndicator'])) {
+            $sub = $indicator['subIndicator'];
+
+            $createdSub = Indicator::create([
                 'output_id' => $output->id,
                 'database_id' => $database->id,
-                'type_id' => $typeId,
-                'indicator' => $indicator['indicator'],
-                'indicatorRef' => $indicator['indicatorRef'],
-                'target' => $indicator['target'],
+                'type_id' => null,
+                'indicator' => $sub['name'],
+                'indicatorRef' => $sub['indicatorRef'],
+                'target' => $sub['target'] ?? $indicator['target'],
                 'achived_target' => 0,
                 'status' => $indicator['status'],
-                'dessaggregationType' => $indicator['dessaggregationType'],
+                'dessaggregationType' => $sub['dessaggregationType'],
                 'description' => $indicator['description'],
-                'parent_indicator' => null,
+                'parent_indicator' => $main->id,
             ]);
 
             array_push($createdIndicators, [
-                "id" => $main->id,
-                "indicatorRef" => $main->indicatorRef
+                "id" => $createdSub->id,
+                "indicatorRef" => $createdSub->indicatorRef
             ]);
 
-            $provincesDetails = $indicator["provinces"] ?? [];
-            $provincesNames = collect($provincesDetails)->pluck('province')->toArray();
-            $provincesIds = Province::whereIn("name", $provincesNames)->pluck("id", "name")->toArray();
-            
-            $finalProvincesData = [];
-            foreach ($provincesDetails as $provinceData) {
+            $subProvinces = $sub["provinces"] ?? [];
+            $finalSubData = [];
+            foreach ($subProvinces as $provinceData) {
                 $provinceName = strtolower($provinceData["province"]);
                 if (!isset($provincesIds[$provinceName])) continue;
-                $finalProvincesData[$provincesIds[$provinceName]] = [
+                $finalSubData[$provincesIds[$provinceName]] = [
                     "target" => $provinceData["target"],
                     "achived_target" => 0,
                     "councilorCount" => $provinceData["councilorCount"]
                 ];
             }
 
-            
-
-            $main->provinces()->sync($finalProvincesData);
-
-            if (!empty($indicator['subIndicator'])) {
-                $sub = $indicator['subIndicator'];
-
-                $createdSub = Indicator::create([
-                    'output_id' => $output->id,
-                    'database_id' => $database->id,
-                    'type_id' => null,
-                    'indicator' => $sub['name'],
-                    'indicatorRef' => $sub['indicatorRef'],
-                    'target' => $sub['target'] ?? $indicator['target'],
-                    'achived_target' => 0,
-                    'status' => $indicator['status'],
-                    'dessaggregationType' => $sub['dessaggregationType'],
-                    'description' => $indicator['description'],
-                    'parent_indicator' => $main->id,
-                ]);
-
-                array_push($createdIndicators, [
-                    "id" => $createdSub->id,
-                    "indicatorRef" => $createdSub->indicatorRef
-                ]);
-
-                $subProvinces = $sub["provinces"] ?? [];
-                $finalSubData = [];
-                foreach ($subProvinces as $provinceData) {
-                    $provinceName = strtolower($provinceData["province"]);
-                    if (!isset($provincesIds[$provinceName])) continue;
-                    $finalSubData[$provincesIds[$provinceName]] = [
-                        "target" => $provinceData["target"],
-                        "achived_target" => 0,
-                        "councilorCount" => $provinceData["councilorCount"]
-                    ];
-                }
-
-                $createdSub->provinces()->sync($finalSubData);
-            }
+            $createdSub->provinces()->sync($finalSubData);
         }
 
         return response()->json(["status" => true, 'message' => 'Indicators saved successfully.', "data" => $createdIndicators], 201);
@@ -148,7 +138,7 @@ class IndicatorController extends Controller
 
     public function show($id)
     {
-        $indicator = Indicator::with('subIndicators')->find($id);
+        $indicator = Indicator::with('subIndicator')->find($id);
 
         if (!$indicator) {
             return response()->json([
@@ -157,8 +147,19 @@ class IndicatorController extends Controller
             ], 404);
         }
 
+        $indicator["provinces"] = $indicator->provinces->map(function ($province) {
+            $province["province"] = $province->name;
+            $province["councilorCount"] = $province->pivot->councilorCount;
+            $province["target"] = $province->pivot->target;
+
+            unset($province["pivot"], $province["name"]);
+
+            return $province;
+        });
+
         $data = [
-            'outputRef' => $indicator->output->outputRef,
+            'id' => $indicator->id,
+            'outputId' => $indicator->output->id,
             'indicator' => $indicator->indicator,
             'indicatorRef' => $indicator->indicatorRef,
             'target' => $indicator->target,
@@ -166,19 +167,31 @@ class IndicatorController extends Controller
             'provinces' => $indicator->provinces,
             'dessaggregationType' => $indicator->dessaggregationType,
             'description' => $indicator->description,
-            'subIndicator' => $indicator->subIndicators->map(function($sub) use ($indicator) {
+            'database' => $indicator->database->name,
+            'type' => $indicator->type?->type,
+            'parentIndicator' => $indicator->parent_indicator,
+            'subIndicator' => $indicator->subIndicator?->map(function($sub) use ($indicator) {
                 return [
                     'indicatorRef' => $sub->indicatorRef,
                     'name' => $sub->indicator,
                     'target' => $sub->target ?? $indicator->target,
                     'dessaggregationType' => $sub->dessaggregationType ?? $indicator->dessaggregationType,
-                    'provinces' => $sub->provinces,
+                    'provinces' => $sub->provinces->map(function ($province) {
+                       $province["province"] = $province->name;
+                        $province["councilorCount"] = $province->pivot->councilorCount;
+                        $province["target"] = $province->pivot->target;
+
+                        unset($province["pivot"], $province["name"]);
+
+                        return $province;
+                    }),
                 ];
             })->first() 
         ];
 
         return response()->json([
             'status' => true,
+            'message' => '',
             'data' => $data
         ]);
     }
@@ -194,7 +207,7 @@ class IndicatorController extends Controller
             ], 404);
         }
 
-        $output = Output::where("outputRef", $request->input("outputRef", $indicator->output->outputRef))->first();
+        $output = Output::find($request->input("outputId"));
         if (!$output) {
             return response()->json(["status" => false, "message" => "Invalid output ref!"], 404);
         }

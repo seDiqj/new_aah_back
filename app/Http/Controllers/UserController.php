@@ -20,6 +20,12 @@ class UserController extends Controller
 
         if (!$users) return response()->json(["status" => false, "message" => "Somthing gone wronge !"], 401);
 
+        $users = $users->map(function ($user) {
+            $user["updated_by"] = User::find($user["updated_by"])?->name;
+
+            return $user;
+        });
+
         return response()->json(["status" => true, "message" => "", "data" => $users], 200);
         
     }

@@ -78,6 +78,8 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
 
     // managers
     Route::get("/managers", [GlobalController::class, "indexManagers"]);
+
+    Route::get("/project/provinces/{id}", [GlobalController::class, "indexProjectProvinces"]);
 });
 
 Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->group(function () {
@@ -99,12 +101,14 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
 
     // Outcomes Routes.
     Route::get("/outcomes/{id}", [ProjectsController::class, "index"]);
+    Route::get("/outcome/{id}", [OutcomeController::class, "show"]);
     Route::post("/o/outcome", [OutcomeController::class, "store"]);
     Route::put("/outcome/{id}", [OutcomeController::class, "update"]);
     Route::delete("/outcome/{id}", [OutcomeController::class, "destroy"]);
 
     // Outputs Routes.
     Route::get("/outputs/{id}", [ProjectsController::class, "indexProjectOutputs"]);
+    Route::get("/output/{id}", [OutputController::class, "show"]);
     Route::post("/o/output", [OutputController::class, "store"]);
     Route::put("/output/{id}", [OutputController::class, "update"]);
     Route::delete("/output/{id}", [OutputController::class, "destroyOutput"]);
@@ -112,7 +116,7 @@ Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->grou
     // Indecators / Activities Routes.
     Route::get("/indicators/{id}", [ProjectsController::class, "indexProjectIndicators"]);
     Route::get("/indicators/{databaseName}/{id}", [ProjectsController::class, "indixProjectSpicificDatabaseIndicator"]);
-    Route::get("/indicator/{id}", [IndicatorController::class, "showIndicator"]);
+    Route::get("/indicator/{id}", [IndicatorController::class, "show"]);
     Route::post("/i/indicator", [IndicatorController::class, "store"]);
     Route::put("/indicator/{id}", [IndicatorController::class, "update"]);
     Route::put("/indicator/change_status/{id}", [IndicatorController::class, "changeIndicatorStatus"]);

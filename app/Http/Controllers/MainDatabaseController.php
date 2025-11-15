@@ -10,6 +10,7 @@ use App\Models\Indicator;
 use App\Models\IndicatorSession;
 use App\Models\IndicatorType;
 use App\Models\KitDistribution;
+use App\Models\MealTool;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
@@ -341,7 +342,17 @@ class MainDatabaseController extends Controller
 
     }
 
-    public function destroyMealtool(string $id) {}
+    public function destroyMealtool(string $id) {
+    
+        $mealTool = MealTool::find($id);
+
+        if (!$mealTool) return response()->json(["status" => false, "message" => "No such mealtool in database !"], 404);
+
+        $mealTool->delete();
+
+        return response()->json(["status" => true, "message" => "Mealtool successfully deleted !"], 200);
+
+    }
 
     public function destroySession (string $id)
     {

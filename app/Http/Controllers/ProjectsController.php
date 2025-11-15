@@ -400,7 +400,6 @@ class ProjectsController extends Controller
             'startDate'        => 'required|date',
             'endDate'          => 'required|date|after_or_equal:startDate',
             'status'           => 'required|in:planed,ongoing,completed,onhold,canclled',
-            'aprStatus'        => 'required|in:notCreatedYet,created,hodDhodApproved,grantFinalized,hqFinalized',
             'projectManager'   => 'required|string|max:255',
             'reportingDate'    => 'required|string|max:255',
             'reportingPeriod'  => 'required|string|max:255',

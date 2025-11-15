@@ -21,7 +21,7 @@ return new class extends Migration
             $table->enum("gender", ["male", "female", "other"]);
             $table->enum("maritalStatus", ["single", "married", "divorced", "widowed", "widower", "sperated"])->nullable();
             $table->string("childCode")->nullable();
-            $table->char("childAge")->nullable();
+            $table->char("  ")->nullable();
             $table->string("phone");
             $table->string("nationalId", 20)->nullable();
             $table->string("householdStatus")->nullable();

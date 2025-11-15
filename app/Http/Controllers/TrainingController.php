@@ -141,14 +141,6 @@ class TrainingController extends Controller
     public function store (StoreTrainingRequest $request)
     {
 
-        $project = Project::where("projectCode", $request->input("projectCode"))->first();
-        
-        if (!$project) return response()->json(["status" => false, "message" => "Invalid project code !"], 404);
-
-        $province = Province::where("name", $request->input("province"))->first();
-
-        if (!$province) return response()->json(["status" => false, "message" => "Invalid province !"], 404);
-
         $indicator = Indicator::where("indicator", $request->input("indicator"))->first();
 
         if (!$indicator) return response()->json(["status" => false, "message" => "Invalid indicator !"], 404);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOutcomeRequest;
 use App\Models\Outcome;
+use App\Models\Project;
 use Illuminate\Http\Request;
 
 class OutcomeController extends Controller
@@ -33,18 +34,27 @@ class OutcomeController extends Controller
 
         $projectId = $request["project_id"];
 
-        $createdOutcomes = [];
+        $project = Project::find($projectId);
 
-        foreach ($validated["outcomes"] as $outcome) {
-            $outcome["project_id"] = $projectId;
-            
-            $createdOutcome = Outcome::create($outcome);
+        if (!$project) return response()->json(["status" => false, "message" => "No such project in system !"], 404);
 
-            array_push($createdOutcomes, ["id" => $createdOutcome->id, "outcomeRef" => $createdOutcome->outcomeRef]);
-        }
+        $validated["project_id"] = $projectId;
+        
+        $createdOutcome = Outcome::create($validated);
 
+        return response()->json(["status" => true, "message" => "Outcomes successfully saved !", "data" => $createdOutcome]);
 
-        return response()->json(["status" => true, "message" => "Outcomes successfully saved !", "data" => $createdOutcomes]);
+    }
+
+    public function show (string $id)
+    {
+        $outcome = Outcome::find($id);
+        
+        if (!$outcome) return response()->json(["status" => false, "message" => "No such outcome in system !"], 404);
+
+        unset($outcome["id"], $outcome["project_it"]);
+
+        return response()->json(["status" => true, "message" => "", "data" => $outcome]);
 
     }
     
