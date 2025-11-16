@@ -14,7 +14,7 @@ class StoreProgramRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'projectCode'            => 'required|exists:projects,projectCode',
+            'project_id'            => 'required|exists:projects,id',
             'focalPoint'           => 'required|string|max:255',
             'province'           => 'required|exists:provinces,name',
             'district'           => 'required|exists:districts,name',

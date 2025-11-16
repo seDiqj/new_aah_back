@@ -32,7 +32,7 @@ class GlobalController extends Controller
 
         $indicators = Indicator::whereHas("database", function ($query) use ($databaseName) {
             $query->where("name", $databaseName);
-        })->select("indicator")->get();
+        })->select("id", "indicatorRef")->get();
 
         if ($indicators->isEmpty()) return response()->json(["status" => false, "message" => "No indicator was found for " . $databaseName], 404);
 
@@ -86,7 +86,7 @@ class GlobalController extends Controller
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in system !"], 404);
 
-        $provinces = $project->provinces()->select("id", "name")->get();
+        $provinces = $project->provinces;
 
         return response()->json(["status" => true, "message" => "", "data" => $provinces], 200);
     }

@@ -25,9 +25,9 @@ class Project extends Model
         'description',
     ];
 
-    protected $casts = [
-        'startDate' => 'datetime',
-        'endDate' => 'datetime',
+   protected $casts = [
+        'startDate' => 'datetime:F d, Y',
+        'endDate' => 'datetime:F d, Y',
     ];
 
     public function outcomes()

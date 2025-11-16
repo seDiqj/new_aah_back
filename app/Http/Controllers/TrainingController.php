@@ -141,29 +141,7 @@ class TrainingController extends Controller
     public function store (StoreTrainingRequest $request)
     {
 
-        $indicator = Indicator::where("indicator", $request->input("indicator"))->first();
-
-        if (!$indicator) return response()->json(["status" => false, "message" => "Invalid indicator !"], 404);
-
-        $district = District::where("name", $request->input("district"))->first();
-
-        if (!$district) return response()->json(["status" => false, "message" => "Invalid district !"], 404);
-
         $validated = $request->except("chapters");
-
-        $validated["project_id"] = $project->id;
-
-        $validated["province_id"] = $province->id;
-
-        $validated["indicator_id"] = $indicator->id;
-
-        $validated["district_id"] = $district->id;
-
-        unset($validated["projectCode"]);
-        unset($validated["province"]);
-        unset($validated["indicator"]);
-        unset($validated["district"]);
-
 
         $training = Training::create($validated);
 
@@ -223,30 +201,7 @@ class TrainingController extends Controller
                 "message" => "No such training found!"
             ], 404);
 
-        $project = Project::where("projectCode", $request->input("projectCode"))->first();
-        if (!$project)
-            return response()->json(["status" => false, "message" => "Invalid project code!"], 404);
-
-        $province = Province::where("name", $request->input("province"))->first();
-        if (!$province)
-            return response()->json(["status" => false, "message" => "Invalid province!"], 404);
-
-        $indicator = Indicator::where("indicator", $request->input("indicator"))->first();
-        if (!$indicator)
-            return response()->json(["status" => false, "message" => "Invalid indicator!"], 404);
-
-        $district = District::where("name", $request->input("district"))->first();
-        if (!$district)
-            return response()->json(["status" => false, "message" => "Invalid district!"], 404);
-
         $validated = $request->except("chapters");
-
-        $validated["project_id"] = $project->id;
-        $validated["province_id"] = $province->id;
-        $validated["indicator_id"] = $indicator->id;
-        $validated["district_id"] = $district->id;
-
-        unset($validated["projectCode"], $validated["province"], $validated["indicator"], $validated["district"]);
 
         $training->update($validated);
 
@@ -296,6 +251,37 @@ class TrainingController extends Controller
         ], 200);
     }
 
+    public function showTrainingForEdit (string $id)
+    {
+
+        $training = Training::with(["chapters", "evaluations"])->find($id);
+
+        if (!$training)
+            return response()->json([
+                "status" => false,
+                "message" => "No such training in system !"
+            ], 404);
+
+        $training->makeHidden([
+            "created_at",
+            "updated_at"
+        ]);
+
+        $training["aprIncluded"] = (bool) $training->aprIncluded;
+
+        $training->chapters = $training->chapters->map(function ($chapter) {
+            unset($chapter->created_at, $chapter->updated_at, $chapter->training_id);
+            return $chapter;
+        });
+
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $training
+        ]);
+
+    }
+
     public function show(string $id)
     {
         $training = Training::with(["chapters", "evaluations"])->find($id);
@@ -306,19 +292,23 @@ class TrainingController extends Controller
                 "message" => "No such training in system !"
             ], 404);
 
-        $training["projectCode"] = optional(Project::find($training->project_id))->projectCode;
-        $training["province"] = optional(Province::find($training->province_id))->name;
-        $training["indicator"] = optional(Indicator::find($training->indicator_id))->indicator;
-        $training["district"] = optional(District::find($training->district_id))->name;
-
         $training->makeHidden([
-            "project_id",
-            "province_id",
-            "indicator_id",
-            "district_id",
             "created_at",
             "updated_at"
         ]);
+
+        $training["projectCode"] = Project::find($training->project_id)?->projectCode;
+        $training["indicatorRef"] = Indicator::find($training->indicator_id)?->indicatorRef;
+        $training["province"] = Province::find($training->province_id)?->name;
+        $training["district"] = District::find($training->district_id)?->name;
+        $training["aprIncluded"] = (bool) $training->aprIncluded;
+
+        unset(
+            $training["project_id"],
+            $training["province_id"],
+            $training["district_id"],
+            $training["indicator_id"],
+        );
 
         $training->chapters = $training->chapters->map(function ($chapter) {
             unset($chapter->created_at, $chapter->updated_at, $chapter->training_id);

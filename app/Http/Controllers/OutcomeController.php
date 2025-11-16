@@ -52,7 +52,7 @@ class OutcomeController extends Controller
         
         if (!$outcome) return response()->json(["status" => false, "message" => "No such outcome in system !"], 404);
 
-        unset($outcome["id"], $outcome["project_it"]);
+        unset($outcome["project_id"]);
 
         return response()->json(["status" => true, "message" => "", "data" => $outcome]);
 

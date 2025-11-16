@@ -14,6 +14,7 @@ class StoreBeneficiaryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'program'             => 'required|exists:programs,id',
             'dateOfRegistration' => 'nullable|date',
             'code'                 => 'nullable|string|max:255',
             'name'                 => 'required|string|max:255',
@@ -34,6 +35,8 @@ class StoreBeneficiaryRequest extends FormRequest
             'incentiveAmount'     => 'nullable|string|max:255',
             'participantOrgnization' => 'nullable|string|max:255',
             'email'                => 'nullable|email|max:255',
+            'indicators'          => 'required|array',
+            'indicators.*'        => 'exists:indicators,id',
         ];
     }
 }

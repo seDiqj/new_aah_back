@@ -47,32 +47,27 @@ class ProgramController extends Controller
 
         if (!$database) return response()->json(["status" => false, "message" => "Invalid database selected !"], 422);
 
-        $project = Project::where("projectCode", $data["projectCode"])->first();
-
-        if (!$project) return response()->json(["status" => false, "message" => "Invalid project code selected !"], 422);
-
         $district = District::where("name", $data["district"])->first();
 
-        if (!$project) return response()->json(["status" => false, "message" => "Invalid district selected !"], 422);
+        if (!$district) return response()->json(["status" => false, "message" => "Invalid district selected !"], 422);
 
         $province = Province::where("name" , $data["province"])->first();
 
-        if (!$project) return response()->json(["status" => false, "message" => "Invalid province selected !"], 422);
+        if (!$province) return response()->json(["status" => false, "message" => "Invalid province selected !"], 422);
 
         $data["database_id"] = $database->id;
-        $data["project_id"] = $project->id;
         $data["district_id"] = $district->id;
         $data["province_id"] = $province->id;
+        $data["project_id"] = $data["project_id"];
 
         unset($data["province"]);
         unset($data["district"]);
-        unset($data["projectCode"]);
 
         $program = Program::create($data);
 
         if (!$program->exists) return response()->json(["status" => false, "message" => "Somthing gone wrong !"], 500);
 
-        return response()->json(["status" => true, "message" => "Program successfully created !"], 200);
+        return response()->json(["status" => true, "message" => "Program successfully created !", "data" => $program], 200);
         
     }
 
@@ -94,7 +89,7 @@ class ProgramController extends Controller
             "database" => $program->database->name,
             "province" => $program->province->name,
             "district" => $program->district->name,
-            "projectCode" => $program->project->projectCode,
+            "project_id" => $program->project->id,
             "focalPoint" => $program->focalPoint,
             "village" => $program->village,
             "siteCode" => $program->siteCode,
@@ -122,19 +117,13 @@ class ProgramController extends Controller
 
         if (!$province) return response()->json(["status" => false, "message" => "Invalid database selected !"], 422);
 
-        $project = Project::where("projectCode", $data["projectCode"])->first();
-
-        if (!$project) return response()->json(["status" => false, "message" => "Invalid project code selected !"], 422);
-
         $district = District::where("name", $data["district"])->first();
 
         if (!$district) return response()->json(["status" => false, "message" => "Invalid district selected !"], 422);
 
-        $data["project_id"] = $project->id;
         $data["province_id"] = $province->id;
         $data["district_id"] = $district->id;
 
-        unset($data["projectCode"]);
         unset($data["province"]);
         unset($data["district"]);
 

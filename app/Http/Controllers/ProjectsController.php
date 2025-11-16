@@ -53,12 +53,13 @@ class ProjectsController extends Controller
         ->with(['outcomes.outputs.indicators' => function ($query) use ($database) {
             $query->where('database_id', $database->id);
         }])
+        ->where("aprStatus", "hqFinalized")
         ->get();
 
         if ($projects->isEmpty()) {
             return response()->json([
                 "status" => false,
-                "message" => "No projects found with indicators in database " . strtoupper(join(" ", explode("_", $databaseName)))
+                "message" => "No projects was found with indicators in database " . strtoupper(join(" ", explode("_", $databaseName))) . " Note: A project should have at least one indicator which belongs to " . $databaseName . " and also it has to be finalized at HQ level to be listed in MYSPACE section."
             ], 404);
         }
 

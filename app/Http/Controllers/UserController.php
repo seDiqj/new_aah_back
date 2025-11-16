@@ -37,14 +37,14 @@ class UserController extends Controller
 
         $data['password'] = Hash::make($data['password']);
 
-        $department = Department::find($data['department']);
-        if (!$department) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Department not found'
-            ], 404);
-        }
-        $data['department_id'] = $department->id;
+        // $department = Department::find($data['department']);
+        // if (!$department) {
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'Department not found'
+        //     ], 404);
+        // }
+        $data['department_id'] = 1;
 
         if ($request->hasFile('photo_path')) {
             $photoPath = $request->file('photo_path')->store('images', 'public');

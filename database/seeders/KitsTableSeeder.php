@@ -14,9 +14,9 @@ class KitsTableSeeder extends Seeder
     public function run(): void
     {
         Kit::create([
-            "name" => "second_test_kit",
+            "name" => "test_kit",
             "description" => "some test description",
-            "status" => "inactive",
+            "status" => "active",
         ]);
     }
 }

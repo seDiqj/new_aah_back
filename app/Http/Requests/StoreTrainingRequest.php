@@ -15,9 +15,9 @@ class StoreTrainingRequest extends FormRequest
     {
         return [
             'project_id'    => 'required|exists:projects,id',
-            'province'   => 'required|string|exists:provinces,name',
-            'district'   => 'required|string|exists:districts,name',
-            'indicator'  => 'required|string|exists:indicators,indicator',
+            'province_id'   => 'required|exists:provinces,id',
+            'district_id'   => 'required|exists:districts,id',
+            'indicator_id'  => 'required|exists:indicators,id',
 
             'trainingLocation'   => 'required|string|max:255',
             'name'               => 'required|string|max:255',

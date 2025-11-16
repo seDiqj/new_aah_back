@@ -8,10 +8,8 @@ use App\Http\Requests\StoreKitForBeneficiaryRequest;
 use App\Models\Beneficiary;
 use App\Models\Database;
 use App\Models\District;
-use App\Models\Indicator;
 use App\Models\Kit;
 use App\Models\KitDistribution;
-use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
@@ -91,11 +89,7 @@ class KitDatabaseController extends Controller
 
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
 
-        $kitsIds = Kit::whereIn("name", $request->input("kits"))->pluck("id")->toArray();
-
-        if (count($kitsIds) != count($request->input("kits"))) return response()->json(["status" => false, "message" => "Invalid kit selected !"], 422);
-
-        foreach($kitsIds as $kitId) {
+        foreach($request->input("kits") as $kitId) {
             $beneficiary->kits()->attach($kitId, [
                 "destribution_date" => $validated["distributionDate"],
                 "remark" => $validated["remark"],
@@ -115,12 +109,6 @@ class KitDatabaseController extends Controller
 
         $indicators = $request->input("indicators");
 
-        $program = Program::where("focalPoint", $request->input("program"))->first();
-
-        if (!$program) return response()->json(["status" => false, "message" => "Invalid program selected !"], 422);
-
-        $indicatorIds = Indicator::whereIn("indicator", $indicators)->pluck("id")->toArray();
-
         $validated = $request->validated();
 
         $validated["protectionServices"] = null;
@@ -129,11 +117,11 @@ class KitDatabaseController extends Controller
 
         $beneficiary = Beneficiary::create($validated);
 
-        $beneficiary->indicators()->sync($indicatorIds);
+        $beneficiary->indicators()->sync($indicators);
 
         $kitDbId = Database::where("name", "kit_database")->first()->id;
 
-        $beneficiary->programs()->attach($program->id, [
+        $beneficiary->programs()->attach($request->input("program"), [
             "database_id" => $kitDbId
         ]);
 
@@ -291,19 +279,22 @@ class KitDatabaseController extends Controller
 
     }
 
-    public function destroyKits(Request $request) {
-
-        $ids = $request->input("ids");
+    public function destroyKitFromBeneficiary(Request $request, string $id) {
 
         $request->validate([
             "ids" => "required|array",
             "ids.*" => "integer"
         ]);
 
+        $ids = $request->input("ids");
+
         $isMoreThenOne = count($ids) > 1 ? true : false;
 
-        KitDistribution::whereIn("id", $ids)->delete();
+        $beneficiary = Beneficiary::find($id);
 
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"]);
+
+        $beneficiary->kits()->whereIn("id", $ids)->delete();
 
         return response()->json(["status" => true, "message" => $isMoreThenOne ? "Kits " : "Kit " . "successfully deleted !"], 200);
 

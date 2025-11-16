@@ -171,6 +171,7 @@ Route::prefix("kit_db")->name("kit_db.")->middleware(["auth:sanctum"])->group(fu
     Route::post("/beneficiary", [KitDatabaseController::class, "storeBeneficiary"]);
     Route::post("/kit", [KitDatabaseController::class, "storeKit"])->middleware("permission:Kit.create");
     Route::post("/delete_kit", [KitDatabaseController::class, "destroyKits"])->middleware("permission:Kit.delete");
+    Route::post("/delete_kit_from_beneficiary/{id}", [KitDatabaseController::class, "destroyKitFromBeneficiary"])->middleware("permission:Kit.delete");
     Route::post("/add_kit_to_bnf/{id}", [KitDatabaseController::class, "addNewKitToBeneficiary"])->middleware("permission:Kit.create");
     Route::put("/beneficiary/{id}", [KitDatabaseController::class, "updateBeneficiary"])->middleware("permission:Kit.edit");
     Route::put("/kit/{id}", [MainDatabaseController::class, "updateKit"])->middleware("permission:Kit.edit");
@@ -219,6 +220,7 @@ Route::prefix("training_db")->name("training_db.")->middleware(["auth:sanctum"])
     Route::get("/beneficiary/trainings/{id}", [TrainingController::class, "indexBeneficiaryTrainings"])->middleware("permission:Training.view");
     Route::get("/trainings/for_selection", [TrainingController::class, "indexTrainingsForSelection"])->middleware("permission:Training.view");
     Route::get("/training/{id}", [TrainingController::class, "show"])->middleware("permission:Training.view");
+    Route::get("/training_for_edit/{id}", [TrainingController::class, "showTrainingForEdit"])->middleware("permission:Training.view");
     Route::get("/beneficiary/{id}", [TrainingController::class, "showBeneficiary"])->middleware("permission:Training.view");
     Route::get("/beneficiary/chapter/preAndPostTest/{bnfId}/{chapterId}", [TrainingController::class, "showBeneficiaryChapterPreAndPostTestScores"])->middleware("permission:Training.view");
     Route::post("/training", [TrainingController::class, "store"])->middleware("permission:Training.create");

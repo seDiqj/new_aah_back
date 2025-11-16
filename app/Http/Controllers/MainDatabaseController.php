@@ -168,14 +168,8 @@ class MainDatabaseController extends Controller
 
     }
 
-    public function storeBeneficiary(StoreBeneficiaryRequest $request) {
-
-        if (!$request->input("program")) 
-        return response()->json(["status" => false, "message" => "Please select a valid program",], 422);
-
-        $program = Program::where("focalPoint", $request->input("program"))->first();
-
-        if (!$program) return response()->json(["status" => false, "message" => "Invalid program selected !"], 422);
+    public function storeBeneficiary(StoreBeneficiaryRequest $request) 
+    {
 
         $validated = $request->validated();
 
@@ -185,7 +179,7 @@ class MainDatabaseController extends Controller
 
         $mainDbId = Database::where("name", "main_database")->first()->id;
 
-        $beneficiary->programs()->attach($program->id, [
+        $beneficiary->programs()->attach($request->input("program"), [
             "database_id" => $mainDbId
         ]);
 

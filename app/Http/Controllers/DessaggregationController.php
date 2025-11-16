@@ -56,7 +56,34 @@ class DessaggregationController extends Controller
             unset($dessaggregation["indicatorRef"]);
             unset($dessaggregation["province"]);
 
-            Dessaggregation::create($dessaggregation);   
+            $exist = Dessaggregation::where("description", $dessaggregation["description"])->where("province_id", $province->id)->where("indicator_id", $dessaggregation["indicatorId"])->first();
+
+            if ($exist)
+                $exist->update($dessaggregation);
+            else
+                Dessaggregation::create($dessaggregation);
+
+            $previusIndicatorDessaggregatoins = $corespondingIndicator->dessaggregations;
+
+            foreach ($previusIndicatorDessaggregatoins as $pd) {
+
+                $exists = false;
+
+                foreach ($dessaggregations as $d) {
+
+                    if (($d["dessaggration"] == $pd["description"]) && ($province->id == $pd["province_id"]))
+                    {
+                        $exists = true;
+                        break;
+                    }
+
+                }
+
+                if (!$exists)
+                    Dessaggregation::find($pd["id"])->delete();
+
+            }
+                        
         }
 
         return response()->json(["status" => true, "message" => "Dessaggregations successfully saved !"], 200);
