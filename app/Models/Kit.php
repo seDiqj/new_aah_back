@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Kit extends Model
-{
+class Kit extends BaseModel
+{    
     protected $fillable = [
 
         "name",

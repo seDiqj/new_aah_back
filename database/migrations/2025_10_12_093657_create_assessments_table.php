@@ -17,6 +17,7 @@ return new class extends Migration
             $table->float("totalScore");
             $table->date("date");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

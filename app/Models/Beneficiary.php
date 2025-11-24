@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Models\CommunityDialogueSession;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Beneficiary extends Model
+class Beneficiary extends BaseModel
 {
     
     protected $fillable = [

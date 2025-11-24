@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Models\Outcome;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 use Carbon\Carbon;
 
-class Project extends Model
+class Project extends BaseModel
 {
     use HasFactory;
 
@@ -85,11 +85,6 @@ class Project extends Model
     public function psychoeducations ()
     {
         return $this->hasManyThrough(Psychoeducations::class, Program::class);
-    }
-
-    public function isp3s ()
-    {
-        
     }
 
 }

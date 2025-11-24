@@ -1,11 +1,11 @@
 <?php
 
 namespace App\Models;
+use App\Models\BaseModel;
 
-use Illuminate\Database\Eloquent\Model;
 
-class Apr extends Model
-{
+class Apr extends BaseModel
+{    
     protected $fillable = [
         "project_id",
         "database_id",

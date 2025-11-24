@@ -16,9 +16,10 @@ return new class extends Migration
             $table->foreignId('project_id')
               ->constrained('projects')
               ->onDelete('cascade');
-            $table->string("outcome");
+            $table->text("outcome");
             $table->string("outcomeRef");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

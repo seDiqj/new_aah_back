@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Isp3 extends Model
+class Isp3 extends BaseModel
 {
-
     protected $hidden = [
         "created_at",
         "updated_at"

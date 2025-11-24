@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
             $table->string("projectCode");
-            $table->string("projectTitle");
-            $table->string("projectGoal");
+            $table->text("projectTitle");
+            $table->text("projectGoal");
             $table->string("projectDonor");
             $table->date("startDate");
             $table->date("endDate");
@@ -32,9 +32,10 @@ return new class extends Migration
                 ]);
             $table->string("projectManager");
             $table->string("reportingDate");
-            $table->string("reportingPeriod");
+            $table->text("reportingPeriod");
             $table->longText("description");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

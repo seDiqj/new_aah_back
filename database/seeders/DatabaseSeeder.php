@@ -1,6 +1,8 @@
 <?php
 
-// Note: please do not seed the database twice using this general seeding class.
+// Note: PLEASE DO NOT SEED THE DATABASE TWICE USING THIS GENERAL SEEDER.
+
+// Note: ONCE YOU SEED THE DATABASE USING THIS GENERAL SEEDER PLEASE COMMINT IT OUT FOR PREVENTING REPETATION.
 
 namespace Database\Seeders;
 

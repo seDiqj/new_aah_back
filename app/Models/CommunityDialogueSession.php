@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class CommunityDialogueSession extends Model
+class CommunityDialogueSession extends BaseModel
 {
     protected $fillable = [
         "community_dialogue_id",

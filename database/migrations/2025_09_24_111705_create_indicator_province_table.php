@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId("indicator_id")->constrained("indicators")->onDelete("cascade");
             $table->foreignId("province_id")->constrained("provinces")->onDelete("cascade");
             $table->integer("target");
-            $table->integer("achived_target");
+            $table->integer("achived_target")->default(0);
             $table->integer("councilorCount");
             $table->timestamps();
         });

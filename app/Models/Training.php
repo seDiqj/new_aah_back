@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Training extends Model
-{
+class Training extends BaseModel
+{    
     protected $fillable = [
         'project_id',
         'province_id',

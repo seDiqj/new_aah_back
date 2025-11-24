@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Psychoeducations extends Model
-{
+
+class Psychoeducations extends BaseModel
+{    
     protected $fillable = [
         "program_id",
         "indicator_id",

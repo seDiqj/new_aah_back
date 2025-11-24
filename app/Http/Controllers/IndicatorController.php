@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreIndicatorRequest;
 use App\Models\Database;
 use App\Models\Indicator;
+use App\Models\IndicatorProvince;
 use App\Models\IndicatorType;
 use App\Models\Isp3;
 use App\Models\Output;
@@ -242,6 +243,9 @@ class IndicatorController extends Controller
                 $finalProvincesData[$provincesIds[$provinceName]] = [
                     "target" => $provinceData["target"],
                     "councilorCount" => $provinceData["councilorCount"] ?? 0,
+                    "achived_target" => IndicatorProvince::whereHas("province", function ($q) use ($provinceData) {
+                        $q->where("name", $provinceData["province"]);
+                    })?->first()->achived_target ?? 0
                 ];
             }
 

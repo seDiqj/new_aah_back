@@ -17,8 +17,9 @@ return new class extends Migration
             $table->foreignId("province_id")->constrained("provinces")->onDelete("cascade");
             $table->string("description");
             $table->integer("target");
-            $table->integer("achived_target");
+            $table->integer("achived_target")->default(0);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

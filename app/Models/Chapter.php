@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Chapter extends Model
+class Chapter extends BaseModel
 {
+
     protected $fillable = [
         "training_id",
         "topic",

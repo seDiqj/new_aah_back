@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class MealTool extends Model
-{
+class MealTool extends BaseModel
+{    
     protected $fillable = [
         "beneficiary_id",
         "type",

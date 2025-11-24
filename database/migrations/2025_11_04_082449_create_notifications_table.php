@@ -28,6 +28,7 @@ return new class extends Migration
             $table->foreignId('apr_id')->nullable()->constrained('aprs')->nullOnDelete();
 
             $table->timestamps();
+            $table->softDeletes();
         });
 
     }

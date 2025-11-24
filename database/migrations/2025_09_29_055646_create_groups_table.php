@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId("community_dialogue_id")->constrained("community_dialogues")->onDelete("cascade");
             $table->string("name");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

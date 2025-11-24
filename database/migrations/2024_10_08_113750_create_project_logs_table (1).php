@@ -29,6 +29,7 @@ return new class extends Migration
             $table->enum("result", ["approved", "rejected"])->nullable();
             $table->text("comment")->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

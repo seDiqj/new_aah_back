@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string("otherDischargeReasone", 100);
             $table->date("dischargeReasonDate");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

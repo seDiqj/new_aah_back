@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class District extends Model
+class District extends BaseModel
 {
     protected $fillable = [
         "name",

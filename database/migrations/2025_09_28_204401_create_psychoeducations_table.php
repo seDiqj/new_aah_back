@@ -39,6 +39,7 @@ return new class extends Migration
             $table->enum("ofGirlDisabilityType", ["personWithDisability", "personWithoutDisability"]);
             $table->string("remark");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

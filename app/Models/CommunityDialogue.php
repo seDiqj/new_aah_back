@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class CommunityDialogue extends Model
-{
+class CommunityDialogue extends BaseModel
+{    
     protected $fillable = [
         "program_id",
         "indicator_id",

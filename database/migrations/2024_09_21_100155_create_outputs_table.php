@@ -14,9 +14,10 @@ return new class extends Migration
         Schema::create('outputs', function (Blueprint $table) {
             $table->id();
             $table->foreignId("outcome_id")->constrained("outcomes")->onDelete("cascade");
-            $table->string("output");
+            $table->text("output");
             $table->string("outputRef");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

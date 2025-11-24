@@ -22,6 +22,7 @@ return new class extends Migration
             $table->date("date");
             $table->boolean("aprIncluded");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

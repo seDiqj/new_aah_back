@@ -42,6 +42,7 @@ return new class extends Migration
             $table->boolean("referralAccepted")->default(false);
             $table->text("referralRejectedReasone")->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

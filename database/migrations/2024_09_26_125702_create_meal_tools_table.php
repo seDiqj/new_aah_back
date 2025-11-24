@@ -26,6 +26,7 @@ return new class extends Migration
             $table->boolean("isEndlineActive");
             $table->string("evaluation");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

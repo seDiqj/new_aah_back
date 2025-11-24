@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\BaseModel;
 
-class Province extends Model
-{
+class Province extends BaseModel
+{    
     protected $fillable = [
         "name"
     ];
 
     protected $hidden = [
         "created_at",
-        "updated_at"
+        "updated_at",
     ];
 
     public function project ()
