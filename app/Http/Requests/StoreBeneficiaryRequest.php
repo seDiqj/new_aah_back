@@ -35,7 +35,7 @@ class StoreBeneficiaryRequest extends FormRequest
             'incentiveAmount'     => 'nullable|string|max:255',
             'participantOrgnization' => 'nullable|string|max:255',
             'email'                => 'nullable|email|max:255',
-            'indicators'          => 'required|array',
+            'indicators'          => 'nullable|array',
             'indicators.*'        => 'exists:indicators,id',
         ];
     }

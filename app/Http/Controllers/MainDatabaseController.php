@@ -31,12 +31,16 @@ class MainDatabaseController extends Controller
             $query->where("database_program_beneficiary.database_id", $mainDbId);
         })->with(["programs" => function ($query) use ($mainDbId) {
             $query->where("database_program_beneficiary.database_id", $mainDbId)
-                  ->select("programs.id", "focalPoint");
+                  ->select("programs.id", "name");
         }])->select("id", "name", "fatherHusbandName", "gender", "age", "code", "phone", "childAge", "childCode", "dateOfRegistration", "maritalStatus", "disabilityType", "householdStatus", "literacyLevel")->get();
-    
+
+        $beneficiaries->map(function ($bnf) {
+            $bnf->programName = $bnf->programs->toArray()[0]["name"];
+            unset($bnf->programs);
+            return $bnf;
+        });
 
         return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
-
     }
 
     public function indexBeneficiaryMealtools(string $id) 
@@ -255,10 +259,6 @@ class MainDatabaseController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $programs]);
     }
 
-    public function showMealtool(string $id) 
-    {       
-    }
-
     public function showBeneficiaryEvaluation(string $id) {
 
         $beneficiary = Beneficiary::find($id);
@@ -307,7 +307,7 @@ class MainDatabaseController extends Controller
         if (!$kitDestribution) return response()->json(["status" => false, "message" => "No such kit for current beneficiary !"], 404);
 
         $validated = $request->validate([
-            "kit_id" => "required|exists:kits,id",
+            "kitId" => "required|exists:kits,id",
             "destribution_date" => "required|date",
             "remark" => "required|string",
             "is_received" => "required|in:0,1"
@@ -348,15 +348,15 @@ class MainDatabaseController extends Controller
 
     }
 
-    public function destroySession (string $id)
+    public function destroySession (string $sessionId)
     {
-        $session = IndicatorSession::find($id);
+        $session = IndicatorSession::find($sessionId);
+    
+        if (!$session) return response()->json(["status" => false, "message" => "No such session for current beneficiary was found !"], 404);
 
-        if (!$session) return response()->json(["status" => false, "message" => "No such session for current beneficiary in systeme !"], 404);
+        $session->forceDelete();
 
-        $session->delete();
-
-        return response()->json(["status" => true, "message" => "Session successfully removed !"], 200);
+        return response()->json(["status" => true, "message" => "Session deleted successfully !"], 200);
     }
 
     public function referrBeneficiaries(Request $request)

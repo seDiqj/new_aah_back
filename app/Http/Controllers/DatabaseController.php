@@ -22,7 +22,7 @@ class DatabaseController extends Controller
 
     public function indexSubmittedAndFirstRejectedDatabases ()
     {
-        $submittedDatabases = Apr::where("status", "submitted")->orWhere("status", "firstRejected")->get();
+        $submittedDatabases = Apr::where("status", "submitted")->orWhere("status", "firstRejected")->orWhere("status", "secondRejected")->get();
 
         if (!$submittedDatabases) return response()->json(["status" => false, "message" => "No submitted databases found !"], 404);
 
@@ -65,7 +65,7 @@ class DatabaseController extends Controller
 
     public function indexFirstApprovedDatabases ()
     {
-        $approvedDatabases = Apr::where("status", "firstApproved")->get();
+        $approvedDatabases = Apr::where("status", "firstApproved")->orWhere("status", "thirdRejected")->get();
 
         if ($approvedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" stage!', "data" => []], 404);
 
@@ -145,7 +145,7 @@ class DatabaseController extends Controller
     public function changeDatabaseStatus(Request $request, string $id)
     {
         $validated = $request->validate([
-            "newStatus" => "required|in:firstApproved,firstRejected",
+            "newStatus" => "required|in:firstApproved,firstRejected,secondApproved,secondRejected",
         ]);
 
         $apr = Apr::find($id);

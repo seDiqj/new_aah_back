@@ -28,17 +28,12 @@ class KitDatabaseController extends Controller
             $query->where("database_program_beneficiary.database_id", $kitDbId);
         })->with(["programs" => function ($query) use ($kitDbId) {
             $query->where("database_program_beneficiary.database_id", $kitDbId)
-                  ->select("programs.id", "focalPoint");
+                  ->select("programs.id", "name");
         }])->get();
         
         $beneficiaries = $beneficiaries->map(function ($beneficiary) {
-            $beneficiary->programs = $beneficiary->programs->map(function ($program) {
-                return [
-                    'id' => $program->id,
-                    'focalPoint' => $program->focalPoint,
-                    'pivot' => $program->pivot
-                ];
-            });
+            $beneficiary->programName = $beneficiary->programs->toArray()[0]["name"];
+            unset($beneficiary->programs);
             return $beneficiary;
         });
         
@@ -89,13 +84,11 @@ class KitDatabaseController extends Controller
 
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
 
-        foreach($request->input("kits") as $kitId) {
-            $beneficiary->kits()->attach($kitId, [
-                "destribution_date" => $validated["distributionDate"],
-                "remark" => $validated["remark"],
-                "is_received" => $validated["isReceived"]
-            ]);
-        }
+        $beneficiary->kits()->attach($request->kitId, [
+            "destribution_date" => $validated["distributionDate"],
+            "remark" => $validated["remark"],
+            "is_received" => $validated["isReceived"]
+        ]);
 
         return response()->json(["status" => true, "message" => "Kit successfully added !"], 200);
         
@@ -219,12 +212,21 @@ class KitDatabaseController extends Controller
     {
         $kit = KitDistribution::find($id);
 
+        $kit->kitId = $kit->kit_id;
+
+        unset(
+            $kit->kit_id,
+            $kit->created_at,
+            $kit->updated_at
+        );
+        
         if (!$kit) return response()->json(["status" => false, "message" => "No such kit in system !"], 404);
 
         return response()->json(["status" => false, "message" => "", "data" => $kit], 200);
     }
 
-    public function updateBeneficiary(Request $request, string $id) {
+    public function updateBeneficiary(Request $request, string $id) 
+    {
 
         $kitDatabaseFromDb = Database::where("name", "kit_database")->first();
 
@@ -244,7 +246,8 @@ class KitDatabaseController extends Controller
 
     }
 
-    public function updateKit(Request $request, string $id) {
+    public function updateKit(Request $request, string $id) 
+    {
 
         $kit = KitDistribution::find($id);
 
@@ -262,7 +265,8 @@ class KitDatabaseController extends Controller
 
     }
 
-    public function destroyBeneficiary(Request $request) {
+    public function destroyBeneficiary(Request $request) 
+    {
 
         $ids = $request->input("ids");
 
@@ -279,7 +283,8 @@ class KitDatabaseController extends Controller
 
     }
 
-    public function destroyKitFromBeneficiary(Request $request, string $id) {
+    public function destroyKitFromBeneficiary(Request $request, string $id) 
+    {
 
         $request->validate([
             "ids" => "required|array",

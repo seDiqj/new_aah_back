@@ -9,6 +9,7 @@ class Program extends BaseModel
     
     protected $fillable = [
         'database_id',
+        'name',
         'project_id',
         'focalPoint',
         'province_id',

@@ -34,8 +34,8 @@ class AuthenticationController extends Controller
         ]);
     }
 
-    public static function logout(Request $request) {
-        $request->user->currentAccessToken()->delete();
+    public function logout(Request $request) {
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             "status" => true,

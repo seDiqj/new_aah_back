@@ -22,8 +22,7 @@ class StoreKitForBeneficiaryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            "kits" => "required|array",
-            "kits.*" => "exists:kits,id",
+            "kitId" => "required|exists:kits,id",
             "distributionDate" => "required|string",
             "remark" => "required|string",
             "isReceived" => "required|boolean"

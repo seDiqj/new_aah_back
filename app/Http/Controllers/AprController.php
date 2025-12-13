@@ -37,15 +37,38 @@ class AprController extends Controller
 
         return response()->json(["status" => true, "message" => "", "data" => $aprs]);
     }
+
+    public function indexGeneratedAprs () {
+        $aprs = Apr::where("status", "fourthRejected")->orWhere("status", "aprGenerated")->get();
+
+        if ($aprs->isEmpty()) return response()->json(["status" => false, "message" => "No apr with status Apr Generated was found !"], 404);
+
+        $aprs->map(function ($reviewedApr) {
+
+            $reviewedApr["projectCode"] = Project::find($reviewedApr["project_id"])->projectCode;
+            $reviewedApr["province"] = Province::find($reviewedApr["province_id"])->name;
+            $reviewedApr["database"] = Database::find($reviewedApr["database_id"])->name;
+
+            unset($reviewedApr["project_id"], $reviewedApr["database_id"], $reviewedApr["province_id"]);
+
+            return $reviewedApr;
+
+        });
+
+        return response()->json(["status" => true, "message" => "", "data" => $aprs]);
+    }
     
     public function generateApr (string $id)
     {
 
         $apr = Apr::find($id);
 
-        if (!$apr || $apr->status != "firstApproved") return response()->json(["status" => false, "message" => "No such database for approval !"], 404);
+        if (!$apr || $apr->status != "firstApproved") return response()->json(["status" => false, "message" => "No such database to generat apr !"], 404);
 
         $instance = new AprGeneratorController();
+
+        $apr->status = 'aprGenerated';
+        $apr->save();
 
         return $instance->generate(
             $apr->project_id,
@@ -61,7 +84,7 @@ class AprController extends Controller
 
         $apr = Apr::find($id);
 
-        if (!$apr || $apr->status != "firstApproved") return response()->json(["status" => false, "message" => "No such database for reviewing !"], 404);
+        if (!$apr || ($apr->status != "aprGenerated" && $apr->status != "secondApproved" && $apr->status != "fourthRejected")) return response()->json(["status" => false, "message" => "No such database for reviewing !"], 404);
 
         $instance = new AprGeneratorController();
 
@@ -87,7 +110,6 @@ class AprController extends Controller
 
     public function markAprAsReviewed(string $id)
     {
-        error_log(1);
         $apr = Apr::find($id);
 
         if (!$apr) {
@@ -141,17 +163,17 @@ class AprController extends Controller
     {
         $apr = Apr::find($id);
 
-        if (!$apr) return response()->json(["status" => false, 'No APR with status "First Approved" found in the system!'], 404);
+        if (!$apr && ($apr->status != "aprGenerated" && $apr->status != "fourthRejected")) return response()->json(["status" => false, 'No APR with status "Apr Generated" found in the system!'], 404);
 
-        $apr->status = "reviewReject";
+        $apr->status = "thirdRejected";
         $apr->save();
 
-        $correspondingAprLogInFirstApproveStage = AprLog::where("status", "firstApproved")->where("apr_id", $id)->first();
+        $correspondingAprLogInAprGeneratedStage = AprLog::where("action", "secondApproved")->where("apr_id", $id)->first();
 
-        if (!$correspondingAprLogInFirstApproveStage)
+        if (!$correspondingAprLogInAprGeneratedStage)
             return response()->json(["status" => false, "message" => "The system could not find the selected APR log in the first approved stage, so it cannot notify anyone to check it!"]);
 
-        $firstApprover = User::find($correspondingAprLogInFirstApproveStage->user_id);
+        $firstApprover = User::find($correspondingAprLogInAprGeneratedStage->user_id);
 
         if (!$firstApprover)
             return response()->json(["status" => false, "message" => "The system could not find the person whe has approved the apr in first stage so it can not notify anyone to check it !"]);
@@ -179,7 +201,7 @@ class AprController extends Controller
         }
 
         $validated = $request->validate([
-            "newStatus" => "required|in:secondApproved,secondRejected",
+            "newStatus" => "required|in:secondApproved,fourthRejected",
         ]);
 
         $validator = User::find(Auth::id());

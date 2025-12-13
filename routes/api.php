@@ -26,7 +26,6 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Isp3Controller;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ChatMessageController;
-use App\Models\Enact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -45,7 +44,7 @@ Route::get('/user', function (Request $request) {
 
 Route::prefix("authentication")->name("auth.")->group(function () {
     Route::post("/login", [AuthenticationController::class, "login"]);
-    Route::post("/logout", [AuthenticationController::class, "logout"]);
+    Route::post("/logout", [AuthenticationController::class, "logout"])->middleware(["auth:sanctum"]);
 });
 
 Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(function () {
@@ -80,6 +79,8 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
     Route::get("/managers", [GlobalController::class, "indexManagers"]);
 
     Route::get("/project/provinces/{id}", [GlobalController::class, "indexProjectProvinces"]);
+
+    Route::get("/databaseBeneficiaries/{id}", [GlobalController::class, "indexDatabaseBeneficiaries"]);
 });
 
 Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->group(function () {
@@ -155,7 +156,7 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
     Route::put("/beneficiary/{id}", [MainDatabaseController::class, "updateBeneficiary"])->middleware("permission:Maindatabase.edit");
     Route::put("/beneficiary/mealtool/{id}", [MainDatabaseController::class, "updateMealtool"])->middleware("permission:Maindatabase.edit");
     Route::put("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "updateBeneficiaryEvaluation"])->middleware("permission:Maindatabase.edit");
-    Route::delete("/beneficiary/sessions/delete_session/{id}", [MainDatabaseController::class, "destroySession"])->middleware("permission:Maindatabase.delete");
+    Route::delete("/beneficiary/sessions/delete_session/{sessionId}", [MainDatabaseController::class, "destroySession"])->middleware("permission:Maindatabase.delete");
     Route::delete("/beneficiary/mealtool/{id}", [MainDatabaseController::class, "destroyMealtool"])->middleware("permission:Maindatabase.delete");
 
 });
@@ -253,7 +254,9 @@ Route::prefix("enact_database")->name("enact_database.")->middleware(["auth:sanc
     Route::post("/assess_assessment", [EnactController::class, "assessAssessment"]);
     Route::post("/", [EnactController::class, "store"]);
     Route::put("/{id}", [EnactController::class, "update"]);
+    Route::get("/assessment/{id}", [EnactController::class, "updateAssessmentScore"]);
     Route::post("/delete_enacts", [EnactController::class, "destroy"]);
+    Route::delete("/delete_assessment/{id}", [EnactController::class, "destroyAssessment"]);
 });
 
 // permissions done (need quik review)
@@ -309,6 +312,7 @@ Route::prefix("db_management")->name("db_management.")->middleware("auth:sanctum
 
 // permission done needs full review
 Route::prefix("apr_management")->name("apr_management.")->middleware("auth:sanctum")->group(function () {
+    Route::get('/generated_aprs', [AprController::class, 'indexGeneratedAprs'])->middleware("permission:Apr.review");
     Route::get("/reviewed_aprs", [AprController::class, "indexReviewedAprs"])->middleware("permission:Apr.review");
     Route::get("/show_apr/{id}", [AprController::class, "showGeneratedApr"])->middleware("permission:Apr.review");
     Route::get("/get_system_aprs_status", [AprController::class, "getSystemAprsStatus"])->middleware("permission:Apr.view/list");

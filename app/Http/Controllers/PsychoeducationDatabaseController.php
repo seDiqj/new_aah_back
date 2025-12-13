@@ -18,7 +18,7 @@ class PsychoeducationDatabaseController extends Controller
         if ($psychoeducations->isEmpty()) return response()->json(["status" => false, "message" => "No psychoeducation found !"], 404);
 
         $psychoeducations->map(function ($p) {
-            $p["program"] = Program::find($p["program_id"])->focalPoing;
+            $p["programName"] = Program::find($p["program_id"])->name;
             $p["indicator"] = Indicator::find($p["indicator_id"])->indicatorRef;
 
             unset($p["program_id"], $p["indicator_id"]);

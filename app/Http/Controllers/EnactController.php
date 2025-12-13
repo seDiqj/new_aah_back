@@ -112,6 +112,43 @@ class EnactController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $finalData]);
     }
 
+    public function updateAssessmentScore (string $id) {
+
+        $assessmentScores = Assessment::with("questions")->find($id);
+
+        if (!$assessmentScores) return response()->json(["status" => false, "message" => "No such assessment in system !"], 404);
+
+        $assessmentScores->questions->map(function ($q) {
+            $q->score = $q->pivot->score;
+            unset(
+                $q->id,
+                $q->group,
+                $q->description,
+                $q->created_at,
+                $q->updated_at,
+                $q->pivot
+            );
+
+            return $q;
+        });
+
+        unset(
+            $assessmentScores->id,
+            $assessmentScores->enact_id
+        );
+
+        return response()->json(["status" => true, "message" => "", "data" => $assessmentScores], 200);
+
+    }
+
+    public function destroyAssessmentScore (string $id) {
+
+    }
+
+    public function showAssessmentScore (string $id) {
+
+    }
+
     public function destroy (Request $request)
     {
         $validated = $request->validate([
@@ -124,6 +161,16 @@ class EnactController extends Controller
         Enact::whereIn("id", $ids)->delete();
 
         return response()->json(["status" => false, "message" => "Assessments successfully deleted !"], 200);
+    }
+
+    public function destroyAssessment(string $id) {
+        $assessment = Assessment::find($id);
+
+        if (!$assessment) return response()->json(["status" => false, "message" => "No such assessment in system !"], 404);
+
+        $assessment->forceDelete();
+
+        return response()->json(["status" => true, "message" => "Assessment successfully deleted !"], 200);
     }
 
     public function assessAssessment(Request $request)

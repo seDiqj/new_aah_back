@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Models\Outcome;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\BaseModel;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class Project extends BaseModel
 {
@@ -29,6 +29,28 @@ class Project extends BaseModel
         'startDate' => 'datetime:F d, Y',
         'endDate' => 'datetime:F d, Y',
     ];
+
+    protected static function booted()
+    {
+        parent::booted();
+
+        static::deleting(function ($project) {
+            $project->programs()->select('id')->chunk(100, function ($programs) use ($project) {
+                foreach ($programs as $programRow) {
+                    $program = \App\Models\Program::find($programRow->id);
+                    if (!$program) continue;
+
+                    if ($project->isForceDeleting()) {
+                        $program->forceDelete();
+                        Log::info("ForceDeleted program id={$program->id}");
+                    } else {
+                        $program->delete();
+                        Log::info("SoftDeleted program id={$program->id}");
+                    }
+                }
+            });
+        });
+    }
 
     public function outcomes()
     {

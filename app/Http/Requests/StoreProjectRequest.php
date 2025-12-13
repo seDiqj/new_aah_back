@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreProjectRequest extends FormRequest
 {
@@ -11,10 +12,12 @@ class StoreProjectRequest extends FormRequest
         return true; 
     }
 
+    
+
     public function rules(): array
     {
         return [
-            'projectCode'      => 'required|string|max:255|unique:projects,projectCode',
+            'projectCode'      => ['required', 'string', 'max:255', Rule::unique('projects', 'projectCode')->whereNull('deleted_at')],
             'projectTitle'     => 'required|string|max:255',
             'projectGoal'      => 'required|string|max:255',
             'projectDonor'     => 'required|string|max:255',

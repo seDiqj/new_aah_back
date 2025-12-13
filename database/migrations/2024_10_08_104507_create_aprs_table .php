@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId("project_id")->constrained("projects")->cascadeOnDelete();
             $table->foreignId("database_id")->constrained("databases")->cascadeOnDelete();
             $table->foreignId("province_id")->constrained("provinces");
-            $table->enum("status", ["submitted", "firstApproved", "firstRejected", "reviewed", "secondApproved", "secondRejected"]);
+            $table->enum("status", ["submitted", "firstApproved", "firstRejected", "aprGenerated", "secondRejected", "reviewed", "thirdRejected", "secondApproved", "fourthRejected"]);
             $table->date("fromDate");
             $table->date("toDate");
             $table->timestamps();

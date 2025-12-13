@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreIndicatorRequest;
 use App\Models\Database;
+use App\Models\Dessaggregation;
 use App\Models\Indicator;
 use App\Models\IndicatorProvince;
 use App\Models\IndicatorType;
@@ -229,6 +230,33 @@ class IndicatorController extends Controller
             'dessaggregationType' => $request->input('dessaggregationType', $indicator->dessaggregationType),
             'description' => $request->input('description', $indicator->description),
         ]);
+
+        if ($request->input('dessaggregationType') !== $indicator->dessaggregationType) {
+            if ($request->input('dessaggregationType') == "session") {
+                $coresspondingDessaggregations = Dessaggregation::where("indicator_id", $indicator->id)->get();
+
+                if ($request->has('subIndicator') && $request->input("subIndicator") != null) {
+                    $sub = $request->input('subIndicator');
+
+                    $subIndicator = Indicator::firstOrNew([
+                        'indicatorRef' => $sub['indicatorRef'],
+                        'parent_indicator' => $indicator->id
+                    ]);
+
+                    foreach ($coresspondingDessaggregations as $d) {
+                        $d->indicator_id = $subIndicator->id;
+                        $d->save();
+                    }
+
+                    $subIndicatorCorrespondingDessaggregations = Dessaggregation::where("indicator_id", $subIndicator->id)->get();
+
+                    foreach ($subIndicatorCorrespondingDessaggregations as $d) {
+                        $d->indicator_id = $indicator->id;
+                        $d->save();
+                    }
+                }
+            }
+        }
 
         $provincesDetails = $request->input("provinces", []);
         if (is_array($provincesDetails) && count($provincesDetails) > 0) {

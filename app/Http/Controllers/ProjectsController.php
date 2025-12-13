@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
-use App\Http\Requests\StoreNewAprRequest;
 use App\Http\Requests\StoreProjectRequest;
 use App\Models\Apr;
 use App\Models\Database;
-use App\Models\DatabaseProgramBeneficiary;
 use App\Models\Dessaggregation;
 use App\Models\Enact;
 use App\Models\Indicator;
@@ -508,7 +506,6 @@ class ProjectsController extends Controller
 
     public function destroyProject(Request $request) 
     {
-        
         $ids = $request->input("ids");
 
         $request->validate([
@@ -516,10 +513,15 @@ class ProjectsController extends Controller
             "ids.*" => "integer"
         ]);
 
-        Project::whereIn("id", $ids)->delete();
+        $projects = Project::whereIn("id", $ids)->get();
 
-        return response()->json(["status" => true, "message" => "Project successfully deleted !"], 200);
+        foreach ($projects as $project) {
+            $project->delete(); 
+        }
+
+        return response()->json(["status" => true, "message" => "Project successfully deleted!"], 200);
     }
+
 
     public function destroySubmittedDatabase (Request $request)
     {

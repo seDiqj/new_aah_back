@@ -181,11 +181,13 @@ class CommunityDialogueDatabaseController extends Controller
         $communityDialogue["program"]["province"] = Province::find($communityDialogue["program"]["province_id"])->name;
 
         unset(
-            $communityDialogue["program_id"], 
-            $communityDialogue["project_id"], 
-            $communityDialogue["database_id"], 
-            $communityDialogue["province_id"], 
-            $communityDialogue["district_id"]
+            $communityDialogue["program"]["program_id"], 
+            $communityDialogue["program"]["project_id"], 
+            $communityDialogue["program"]["database_id"], 
+            $communityDialogue["program"]["province_id"], 
+            $communityDialogue["program"]["district_id"],
+            $communityDialogue["program"]["created_at"],
+            $communityDialogue["program"]["updated_at"],
         );
 
         $communityDialogue["groups"]->map(function ($group) {
@@ -209,6 +211,10 @@ class CommunityDialogueDatabaseController extends Controller
         }
 
         $communityDialogue->program->indicator_id = $communityDialogue->indicator_id;
+
+        $programInformation = [];
+
+        $programInformation["database"] = Database::find($communityDialogue->program->database_id)->name;
 
         $finalData = [
                 "programInformation" => $communityDialogue->program,
@@ -421,7 +427,7 @@ class CommunityDialogueDatabaseController extends Controller
 
         $ids = $request->input("ids");
 
-        $beneficiary->cdSessions()->whereIn('community_dialogue_session_id', $ids)->delete();
+        $beneficiary->cdSessions()->whereIn('community_dialogue_session_id', $ids)->forceDelete();
 
         return response()->json(["status" => true, "message" => "Sessions successfully removed !"], 200);
 

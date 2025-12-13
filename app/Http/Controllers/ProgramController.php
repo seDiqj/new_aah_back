@@ -21,10 +21,11 @@ class ProgramController extends Controller
         $programs = Program::with(["project:id,projectCode", "province:id,name", "district:id,name", "database:id,name"])->where("database_id", $database->id)->get()->map(function ($program) {
             return [
                 "id" => $program->id,
-                "database" => $program->database->name,
-                "province" => $program->province->name,
-                "district" => $program->district->name,
-                "projectCode" => $program->project->projectCode,
+                "database" => $program->database?->name,
+                "name" => $program->name,
+                "province" => $program->province?->name,
+                "district" => $program->district?->name,
+                "projectCode" => $program->project?->projectCode,
                 "focalPoint" => $program->focalPoint,
                 "village" => $program->village,
                 "siteCode" => $program->siteCode,

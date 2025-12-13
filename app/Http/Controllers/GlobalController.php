@@ -8,15 +8,13 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Province;
 use App\Models\User;
+use App\Models\Apr;
+use App\Models\Database;
 use App\Models\Beneficiary;
 use Illuminate\Http\Request;
 
 class GlobalController extends Controller
 {
-
-    public function indexBeneficiaryIndicators(string $id) {}
-
-    public function indexDatabasePrograms(string $db) {}
 
     public function indexManagers ()
     {
@@ -51,14 +49,6 @@ class GlobalController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $programs]);
     }
 
-    public function storeProgram(Request $request, string $db) {}
-
-    public function showProgram(string $db) {}
-
-    public function updateProgram(Request $request, string $db, string $id ) {}
-
-    public function destroyProgram(Request $request, string $db, string $id) {}
-
     public function indexDistricts (Request $request) {
 
         $districts = District::select("id", "name")->get();
@@ -89,6 +79,25 @@ class GlobalController extends Controller
         $provinces = $project->provinces;
 
         return response()->json(["status" => true, "message" => "", "data" => $provinces], 200);
+    }
+
+    public function indexDatabaseBeneficiaries(string $id) {
+
+        $database = Apr::find($id);
+
+        if (!$database) return response()->json(["status" => false, "message" => "No such database in system !"], 404);
+
+        $beneficiaries = Beneficiary::whereHas("programs", function ($q) use ($database) {
+            $q->where("project_id", $database->project_id)->where("province_id", $database->province_id);
+        })->whereHas("databases", function ($q) use ($database) {
+            $q->where("name", Database::find($database->database_id)->name);
+        })->get();
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiaries was found for current database !"], 404);
+
+        return response()->json(["status" => true, "message" => "", "data" => $beneficiaries], 200);
+
+
     }
 
     public function changeBeneficiaryAprIncluded (string $id)

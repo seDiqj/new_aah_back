@@ -17,6 +17,7 @@ return new class extends Migration
             $table->json('evaluations');
             $table->text('remark')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
         ;
     }

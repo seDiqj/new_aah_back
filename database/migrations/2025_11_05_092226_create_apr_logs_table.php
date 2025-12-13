@@ -15,14 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId("apr_id")->constrained("aprs")->cascadeOnDelete();
             $table->foreignId("user_id")->constrained("users");
-            $table->enum("action", [
-                "submitted",
-                "firstApproved",
-                "firstRejected",
-                "reviewed",
-                "secondApproved",
-                "secondRejected",
-            ]);
+            $table->enum("action", ["submitted", "firstApproved", "firstRejected", "aprGenerated", "secondRejected", "reviewed", "thirdRejected", "secondApproved", "fourthRejected"]);
             $table->longText("comment")->nullable();
             $table->timestamps();
             $table->softDeletes();

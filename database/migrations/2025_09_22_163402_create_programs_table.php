@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId("database_id")->constrained("databases")->onDelete("cascade");
             $table->foreignId("project_id")->constrained("projects")->onDelete("cascade");
+            $table->text("name");
             $table->string("focalPoint");
             $table->foreignId("province_id")->constrained("provinces")->onDelete("cascade");
             $table->foreignId("district_id")->constrained("districts");
