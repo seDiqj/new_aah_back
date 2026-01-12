@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string("description");
             $table->integer("target");
             $table->integer("achived_target")->default(0);
+            $table->json('months')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

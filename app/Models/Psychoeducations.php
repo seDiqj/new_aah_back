@@ -44,6 +44,11 @@ class Psychoeducations extends BaseModel
         "updated_at"
     ];
 
+    public function indicator ()
+    {
+        return $this->belongsTo(Indicator::class);
+    }
+
     public function program ()
     {
         return $this->belongsTo(Program::class);

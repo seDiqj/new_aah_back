@@ -6,19 +6,77 @@ use App\Http\Requests\StoreProgramRequest;
 use App\Models\Database;
 use App\Models\District;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
 
 class ProgramController extends Controller
 {
-    public function index (string $databaseName) {
+    public function index (Request $request, string $databaseName) {
 
-        $database = Database::where("name", $databaseName)->first();
+        $databaseId = Database::where('name', $databaseName)->value('id');
 
-        if (!$database) return response()->json(["status" => false, "message" => "Invalid database selectd !"], 422);
+        if (!$databaseId) return response()->json(["status" => false, "message" => "Invalid database selectd !"], 422);
 
-        $programs = Program::with(["project:id,projectCode", "province:id,name", "district:id,name", "database:id,name"])->where("database_id", $database->id)->get()->map(function ($program) {
+        $query = Program::query()
+            ->with(['project']);
+        
+        $query->where('database_id', $databaseId);
+
+        if ($search = request("search")) {
+            $query->where('name', 'like', '%' . $search . '%');
+        };
+
+        if ($request->filled('projectCode')) {
+            $query->whereHas('project', function($q) use ($request) {
+                $q->where('projectCode', 'like', '%' . $request->projectCode . '%');
+            });
+        }
+
+        if ($request->filled('focalPoint')) {
+            $query->where('focalPoint', $request->focalPoint);
+        }
+
+        if ($request->filled('province')) {
+            $provinceId = \App\Models\Province::where('name', $request->province)->value('id');
+            if ($provinceId) {
+                $query->where('province_id', $provinceId);
+            }
+        }
+
+        if ($request->filled('district')) {
+            $districtId = \App\Models\District::where('name', $request->district)->value('id');
+            if ($districtId) {
+                $query->where('district_id', $districtId);
+            }
+        }
+
+        if ($request->filled('village')) {
+            $query->where('village', 'like', '%' . $request->village . '%');
+        }
+
+        if ($request->filled('siteCode')) {
+            $query->where('siteCode', $request->siteCode);
+        }
+
+        if ($request->filled('healthFacilityName')) {
+            $query->where('healthFacilityName', 'like', '%' . $request->healthFacilityName . '%');
+        }
+
+        if ($request->filled('interventionModality')) {
+            $query->where('interventionModality', 'like', '%' . $request->interventionModality . '%');
+        }
+
+        $programs = $query->paginate(10);
+
+        if ($programs->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No program was found !",
+                "data" => [],
+            ], 200);
+        }
+
+        $programs->getCollection()->transform(function ($program) {
             return [
                 "id" => $program->id,
                 "database" => $program->database?->name,
@@ -34,9 +92,44 @@ class ProgramController extends Controller
             ];
         });
 
-        if ($programs->isEmpty()) return response()->json(["status" => true, "message" => "No Program found !"],404);
 
-        return response()->json(["status" => true, "message" => "", "data" => $programs]);
+        return response()->json(["status" => true, "message" => "", "data" => $programs], 200);
+
+    }
+
+    public function indexProgramsForSelections (string $databaseName){
+
+        $databaseId = Database::where('name', $databaseName)->value('id');
+
+        if (!$databaseId) return response()->json(["status" => false, "message" => "Invalid database selectd !"], 422);
+
+        $query = Program::query()
+            ->with(['project']);
+        
+        $query->where('database_id', $databaseId);
+
+        if ($search = request("search")) {
+            $query->where("name", "like", "%$search%");
+        }
+
+        $programs = $query->paginate(30);
+
+        if ($programs->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No program was found !",
+                "data" => [],
+            ], 404);
+        }
+
+        $programs->getCollection()->transform(function ($program) {
+            return [
+                "id" => $program->id,
+                "name" => $program->name
+            ];
+        });
+
+        return response()->json(["status" => true, "message" => "", "data" => $programs], 200);
 
     }
 
@@ -87,6 +180,7 @@ class ProgramController extends Controller
         
         $data = [
             "id" => $program->id,
+            "name" => $program->name,
             "database" => $program->database->name,
             "province" => $program->province->name,
             "district" => $program->district->name,

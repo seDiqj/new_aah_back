@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Models\Outcome;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\BaseModel;
-use Illuminate\Support\Facades\Log;
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 
 class Project extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, CascadeAllDeletes;
 
     protected $fillable = [
         'projectCode',
@@ -30,27 +32,21 @@ class Project extends BaseModel
         'endDate' => 'datetime:F d, Y',
     ];
 
-    protected static function booted()
-    {
-        parent::booted();
 
-        static::deleting(function ($project) {
-            $project->programs()->select('id')->chunk(100, function ($programs) use ($project) {
-                foreach ($programs as $programRow) {
-                    $program = \App\Models\Program::find($programRow->id);
-                    if (!$program) continue;
+    protected $cascadeDeletes = [
+        'programs',
+        'outcomes',
+        'aprs',
+        'trainings',
+        'enacts',
+        'notifications',
+        'logs'
+    ];
 
-                    if ($project->isForceDeleting()) {
-                        $program->forceDelete();
-                        Log::info("ForceDeleted program id={$program->id}");
-                    } else {
-                        $program->delete();
-                        Log::info("SoftDeleted program id={$program->id}");
-                    }
-                }
-            });
-        });
-    }
+    protected $cascadeRelations = [
+        'provinces',
+        'sectors',
+    ];
 
     public function outcomes()
     {
@@ -107,6 +103,26 @@ class Project extends BaseModel
     public function psychoeducations ()
     {
         return $this->hasManyThrough(Psychoeducations::class, Program::class);
+    }
+
+    public function aprs()
+    {
+        return $this->hasMany(Apr::class);
+    }
+
+    public function enacts () 
+    {
+        return $this->hasMany(Enact::class);
+    }
+
+    public function trainings ()
+    {
+        return $this->hasMany(Training::class);
+    }
+
+    public function notifications ()
+    {
+        return $this->hasMany(Notification::class);
     }
 
 }

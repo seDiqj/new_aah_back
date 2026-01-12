@@ -18,42 +18,141 @@ use App\Models\Province;
 use App\Models\Training;
 use App\Models\TrainingEvaluation;
 use Illuminate\Http\Request;
+use App\Jobs\AttachBeneficiariesToTrainingChapters;
+use Illuminate\Support\Facades\Auth;
+
 
 class TrainingController extends Controller
 {
-    public function index () {
+    public function index(Request $request)
+    {
+        $query = Training::query()
+            ->with([
+                'project',
+                'province',
+                'district',
+                'indicator',
+            ]);
 
-        $trainings = Training::all();
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', "like", "%" . $request->projectCode . "%")
+            )
+        );
 
-        if ($trainings->isEmpty()) return response()->json(["status" => false, "message" => "No training found !"], 404);
+        $query->when($request->filled('indicatorRef'), fn($q) =>
+            $q->whereHas('indicator', fn($i) =>
+                $i->where('indicatorRef', 'like', "%{$request->indicatorRef}%")
+            )
+        );
 
-        $trainings = $trainings->map(function ($training) {
-            $training["projectCode"] = Project::find($training->project_id)->projectCode;
-            $training["province"] = Province::find($training->province_id)->name;
-            $training["indicator"] = Indicator::find($training->indicator_id)->indicator;
-            $training["district"] = District::find($training->district_id)->name;
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', "like", "%" . $request->province . "%")
+            )
+        );
 
-            unset($training["project_id"]);
-            unset($training["province_id"]);
-            unset($training["indicator_id"]);
-            unset($training["district_id"]);
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $trainings = $query->paginate(10);
+
+        if ($trainings->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No training was found!",
+                "data" => []
+            ], 200);
+        }
+
+        $trainings->getCollection()->transform(function ($training) {
+
+            $tempProject = $training->project;
+            $tempProvince = $training->province;
+            $tempDistrict = $training->district;
+            $tempIndicator = $training->indicator;
+            
+            unset($training->project, $training->province, $training->district, $training->indicator);
+
+            $training->projectCode = $tempProject?->projectCode;
+            $training->province = $tempProvince?->name;
+            $training->district = $tempDistrict?->name;
+            $training->indicator = $tempIndicator?->indicator;
 
             return $training;
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $trainings]);
 
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $trainings
+        ]);
     }
 
-    public function indexBeneficiaries ()
+    public function indexBeneficiaries (Request $request)
     {
-        $trainingDB = Database::where("name", "training_database")->first();
 
-        if (!$trainingDB) return response()->json(["status" => false, "message" => "Training database is not a valid database"], 404);
+        $trainingDbId = Database::where("name", "training_database")->pluck("id");
 
-        $beneficiaries = $trainingDB->beneficiaries;
+        $trainingBeneficiaries = DatabaseProgramBeneficiary::where("database_id", $trainingDbId)->pluck("beneficiary_id")->toArray();
 
-        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary was found for training database !"], 404);
+        $query = Beneficiary::query()
+            ->with(['trainings']);
+
+        $query->whereIn("id", $trainingBeneficiaries);
+        
+        if ($request->filled('projectCode') || $request->filled('province') || $request->filled('indicator')) {
+
+            $query->whereHas('trainings', function($q) use ($request) {
+
+                if ($request->filled('projectCode')) {
+                    $q->whereHas('project', function($q2) use ($request) {
+                        $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                    });
+                }
+
+                if ($request->filled('province')) {
+                    $q->whereHas('province', function ($q) use ($request) {
+                        $q->where("name", "like", "%" . $request->province . "%");
+                    });
+                }
+
+                if ($request->filled('indicator')) {
+                    $q->whereHas("indicator", function ($q) use ($request) {
+                        $q->where("indicatorRef", "like", "%" . $request->indicator . "%");
+                    });
+                }
+
+            });
+
+
+        }
+        
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', "like", "%" . $request->dateOfRegistration . "%");
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', "like", "%" . $request->age . "%");
+        }
+
+        if ($request->filled('gender')){
+            $query->where("age", "like", "%" . $request->age . "%");
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        if ($request->filled('code')) {
+            $query->where("code", "like", "%" . $request->code . "%");
+        }
+
+        $beneficiaries = $query->paginate(10);
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary was found !", "data" => []], 200);
 
         return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
     }
@@ -129,6 +228,35 @@ class TrainingController extends Controller
         ]);
     }
 
+    public function indexTrainingBeneficiaries(Request $request, string $id)
+    {
+
+        $training = Training::find($id);
+
+        if (!$training) return response()->json(["status" => false, "message" => "No such training in system !", "data" => []], 404);
+
+        $query = $training->beneficiaries();
+
+        if ($request->filled('age')) {
+            $query->where('age', "like", "%" . $request->age . "%");
+        }
+
+        if ($request->filled('gender')){
+            $query->where("gender", "like", "%" . $request->age . "%");
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $beneficiaries = $query->paginate(10);
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary was found !", "data" => []], 200);
+
+        return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
+
+    }
+
     public function indexTrainingsForSelection ()
     {
         $trainings = Training::select("name")->get();
@@ -166,7 +294,12 @@ class TrainingController extends Controller
 
         $training->chapters()->create($validated);
 
-        return response()->json(["status" => true, "message" => "Chapter successfully added !"], 200);
+        AttachBeneficiariesToTrainingChapters::dispatch(
+            $training,
+            Auth::id()
+        );
+
+        return response()->json(["status" => true, "message" => "Chapter successfully created !,  now the system will attach the new chapter to training beneficiaries. We will notify you once the process is done.", "data" => []], 200);
     }
 
     public function storeNewBeneficiary (StoreTrainingBeneficiaryRequest $request)
@@ -205,16 +338,20 @@ class TrainingController extends Controller
 
         $training->update($validated);
 
-        $training->chapters()->delete();
-
         $chapters = $request->input("chapters", []);
+
         foreach ($chapters as $chapter) {
-            $training->chapters()->create($chapter);
+            $training->chapters()->updateOrCreate($chapter);
         }
+
+        AttachBeneficiariesToTrainingChapters::dispatch(
+            $training,
+            Auth::id()
+        );
 
         return response()->json([
             "status" => true,
-            "message" => "Training successfully updated!"
+            "message" => "Training successfully updated!, now the system will attach all new chapters to training beneficiaries. We will notify you once the process is done."
         ], 200);
     }
     
@@ -249,6 +386,21 @@ class TrainingController extends Controller
             "message" => "Beneficiary successfully updated!",
             "data" => $beneficiary
         ], 200);
+    }
+
+    public function updateChapter(StoreChapterRequest $request, string $id)
+    {
+
+        $chapter = Chapter::find($id);
+
+        if (!$chapter) return response()->json(["status" => false, "message" => "No such chapter in system !", "data" => []], 404);
+
+        $validated = $request->validated();
+
+        $chapter->update($validated);
+
+        return response()->json(["status" => true, "message" => "Chapter successfully updated !", "data" => []], 200);
+
     }
 
     public function showTrainingForEdit (string $id)
@@ -353,14 +505,28 @@ class TrainingController extends Controller
         ], 200);
     }
 
+    public function showChapter(string $id)
+    {
+
+        $chapter = Chapter::find($id);
+
+        if (!$chapter) return response()->json(["status" => false, "message" => "No such chapter in system !", "data" => []]);
+
+        unset($chapter->training_id);
+
+        return response()->json(["status" => true, "message" => "", "data" => $chapter], 200);
+
+    }
+
     public function destroy (Request $request)
     {
-        $ids = $request->input("ids");
-
+        
         $request->validate([
             "ids" => "required|array",
             "ids.*" => "integer"
         ]);
+        
+        $ids = $request->input("ids");
 
         Training::whereIn("id", $ids)->delete();
 
@@ -368,17 +534,30 @@ class TrainingController extends Controller
     } 
 
     public function destroyBeneficiaries (Request $request)
-    {
-        $ids = $request->input("ids");
-
+    { 
         $request->validate([
             "ids" => "required|array",
             "ids.*" => "integer"
         ]);
+        
+        $ids = $request->input("ids");
 
         Beneficiary::whereIn("id", $ids)->delete();
 
         return response()->json(["status" => true, "message" => "Trainings successfully deleted !"], 200);
+    }
+
+    public function destroyChapter (string $id)
+    {
+
+        $chapter = Chapter::find($id);
+
+        if (!$chapter) return response()->json(["status" => false, "message" => "No such chapter in system !", "data" => []], 404);
+
+        $chapter->delete();
+
+        return response()->json(["status" => true, "message" => "Chapter successfully deleted !", "data" => []], 200);
+
     }
 
     public function addTrainingToBeneficiaries (AddTrainingToBeneficiaryRequest $request)
@@ -392,7 +571,7 @@ class TrainingController extends Controller
 
         $beneficiariesIds = $validated["ids"];
 
-        $training->beneficiaries()->attach($beneficiariesIds);
+        $training->beneficiaries()->syncWithoutDetaching($beneficiariesIds);
 
         $trainingChaptersIds = $training->chapters()->pluck("id")->toArray();
 
@@ -505,5 +684,45 @@ class TrainingController extends Controller
         if (!$training) return response()->json(["status" => false, "message" => "No such training in system !"], 404);
 
         
+    }
+
+    public function removeBeneficiariesFromTraining (Request $request, string $trainingId)
+    {
+        $training = Training::find($trainingId);
+
+        if (!$training) return response()->json(["status" => false, "message" => "No such training in system !", "data" => []], 404);
+
+        $request->validate([
+            "ids" => "required|array|exists:beneficiaries,id",
+            "ids.*" => "integer"
+        ]);
+        
+        $beneficiaryIds = $request->input("ids");
+
+        $training->beneficiaries()->sync(array_filter($training->beneficiaries()->pluck("beneficiaries.id")->toArray(), function ($value) use ($beneficiaryIds) {
+            !array_key_exists($value, $beneficiaryIds);
+        }));
+
+        return response()->json(["status" => true, "message" => "Selected beneficiaries successfully removed !", "data" => []], 200);
+    }
+
+    public function removeTrainingFromBeneficiary(Request $request) 
+    {
+
+        $validated = $request->validate([
+            "trainingId" => "required|numeric",
+            "beneficiaryId" => "required|numeric"
+        ]);
+
+        $beneficiary = Beneficiary::find($validated["beneficiaryId"]);
+
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in systme !", "data" => []], 404);
+
+        $beneficiary->trainings()->sync(array_filter([$beneficiary->trainings()->pluck("trainings.id")->toArray()], function ($value) use ($validated) {
+            $value != $validated["trainingId"];
+        }));
+
+        return response()->json(["status" => true, "message" => "Training successfully removed from beneficiary !", "data" => []], 200);
+
     }
 }

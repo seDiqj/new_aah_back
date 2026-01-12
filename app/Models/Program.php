@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use App\Models\BaseModel;
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Program extends BaseModel
 {
+
+    use SoftDeletes, CascadeAllDeletes;
     
     protected $fillable = [
         'database_id',
@@ -18,6 +22,18 @@ class Program extends BaseModel
         'siteCode',
         'healthFacilityName',
         'interventionModality',
+    ];
+
+    protected $cascadeDeletes = [
+        'communityDialogues',
+    ];
+
+    protected $cascadeRelations = [
+        'beneficiaries',
+    ];
+
+    protected $cascadeHasOne = [
+        'psychoeducation',
     ];
 
     public function project()
@@ -49,5 +65,10 @@ class Program extends BaseModel
     public function psychoeducation ()
     {
         return $this->hasOne(Psychoeducations::class);
+    }
+
+    public function communityDialogues ()
+    {
+        return $this->hasMany(CommunityDialogue::class);
     }
 }

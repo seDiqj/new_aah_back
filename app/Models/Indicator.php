@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\BaseModel;
+use Dyrynda\Database\Support\CascadeSoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 
 class Indicator extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, CascadeSoftDeletes;
 
     protected $fillable = [
         'output_id',
@@ -24,6 +26,30 @@ class Indicator extends BaseModel
         'description',
     ];
 
+    protected $hidden = [
+        "created_at",
+        "updated_at",
+        "deleted_at"
+    ];
+
+    protected $cascadeDeletes = [
+        'dessaggregations',
+        'sessions',
+        'enacts',
+        'trainings',
+        'CommunityDialogues',
+    ];
+
+    protected $cascadeRelations = [
+        'beneficiaries',
+        'provinces',
+        'isp3',
+    ];
+
+    protected $cascadeHasOne = [
+        'psychoeducations',
+        'refferals'
+    ];
 
     protected $casts = [
 
@@ -81,6 +107,31 @@ class Indicator extends BaseModel
     public function type ()
     {
         return $this->belongsTo(IndicatorType::class);
+    }
+
+    public function enacts()
+    {
+        return $this->hasMany(Enact::class);
+    }
+
+    public function trainings()
+    {
+        return $this->hasMany(Training::class);
+    }
+
+    public function CommunityDialogues ()
+    {
+        return $this->hasMany(CommunityDialogue::class);
+    }
+
+    public function psychoeducations ()
+    {
+        return $this->hasMany(Psychoeducations::class);
+    }
+
+    public function refferals ()
+    {
+        return $this->hasMany(Referral::class);
     }
 }
 

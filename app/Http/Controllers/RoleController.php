@@ -8,16 +8,30 @@ use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $roles = Role::orderBy("created_at", "desc")
-            ->get();
+         $query = Role::query();
+
+        if ($request->filled("name"))
+            $query->where("name", $request->name);
+
+        if ($request->filled("status"))
+            $query->where("status", $request->status);
+
+        if ($search = request("search")) {
+            $query->where(function($q) use ($search) {
+                $q->where("name", "like", "%$search%");
+            });
+        }
+
+        $roles = $query->paginate(10);
 
         if ($roles->isEmpty()) {
             return response()->json([
                 "status" => false,
-                "message" => "No role exists. Please create one !"
-            ], 404);
+                "message" => "No role was found !",
+                "data" => []
+            ], 200);
         }
 
         return response()->json([

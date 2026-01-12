@@ -81,6 +81,12 @@ enum PermissionEnum: string
     case REFERRAL_DELETE = 'Referral.delete';
     case REFERRAL_EXPORT = 'Export.referral excel report';
 
+    // ===================== Myspace Referral =====================
+    case ENACT_CREATE = 'Enact.create';
+    case ENACT_VIEW = 'Enact.view';
+    case ENACT_EDIT = 'Enact.edit';
+    case ENACT_DELETE = 'Enact.delete';
+
     // ===================== Database Management =====================
     case DATABASE_CREATE = 'Database_submission.create';
     case DATABASE_VIEW = 'Database_submission.view';

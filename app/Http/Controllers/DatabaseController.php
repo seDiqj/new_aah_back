@@ -20,54 +20,151 @@ class DatabaseController extends Controller
 {
     use AprToolsTrait;
 
-    public function indexSubmittedAndFirstRejectedDatabases ()
+    public function indexSubmittedAndFirstRejectedDatabases(Request $request)
     {
-        $submittedDatabases = Apr::where("status", "submitted")->orWhere("status", "firstRejected")->orWhere("status", "secondRejected")->get();
+        $query = Apr::query()
+            ->with(['project', 'province', 'database'])
+            ->whereIn('status', ['submitted', 'firstRejected', 'secondRejected']);
 
-        if (!$submittedDatabases) return response()->json(["status" => false, "message" => "No submitted databases found !"], 404);
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', "like", "%" . $request->projectCode . "%")
+            )
+        );
 
+        $query->when($request->filled('database'), fn($q) =>
+            $q->whereHas('database', fn($d) =>
+                $d->where('name', "like", "%" . $request->database . "%")
+            )
+        );
 
-        $submittedDatabases->map(function ($submittedDatabase) {
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', "like", "%" . $request->province . "%")
+            )
+        );
 
-            $submittedDatabase["projectCode"] = Project::find($submittedDatabase["project_id"])->projectCode;
-            $submittedDatabase["province"] = Province::find($submittedDatabase["province_id"])->name;
-            $submittedDatabase["database"] = Database::find($submittedDatabase["database_id"])->name;
+        $query->when($request->filled('fromDate'), fn($q) =>
+            $q->whereDate('fromDate', "like", "%" . $request->fromDate . "%")
+        );
 
-            unset($submittedDatabase["project_id"], $submittedDatabase["database_id"], $submittedDatabase["province_id"]);
+        $query->when($request->filled('toDate'), fn($q) =>
+            $q->whereDate('toDate', "like", "%" . $request->toDate . "%")
+        );
+
+        if ($search = request("search")) {
+            $query->whereHas("project", function ($q) use ($search) {
+                $q->where("projectCode", "like", "%" . $search . "%");
+            });
+        }
+
+        $aprs = $query->paginate(10);
+
+        if ($aprs->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No submitted databases found !",
+                "data" => []
+            ], 200);
+        }
+
+        $aprs->getCollection()->transform(function ($submittedDatabase) {
+
+            $tempProject = $submittedDatabase->project;
+            $tempProvince = $submittedDatabase->province;
+            $tempDatabase = $submittedDatabase->database;
+
+            unset($submittedDatabase->project, $submittedDatabase->province, $submittedDatabase->database);
+
+            $submittedDatabase->projectCode = $tempProject?->projectCode;
+            $submittedDatabase->province = $tempProvince?->name;
+            $submittedDatabase->database = $tempDatabase?->name;
 
             return $submittedDatabase;
-
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $submittedDatabases]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
+        ]);
     }
 
-    public function indexFirstApprovedAndSecondRejectedDatabases ()
+    public function indexFirstApprovedAndSecondRejectedDatabases(Request $request)
     {
-        $firstApprovedOrSecondRejectedDatabases = Apr::where("status", "firstApproved")->orWhere("status", "secondRejected")->get();
+        $query = Apr::query()
+            ->with(['project', 'province', 'database'])
+            ->whereIn('status', ['firstApproved', 'secondRejected']);
 
-        if ($firstApprovedOrSecondRejectedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" or "second rejected" stages!', 'data' => []], 404);
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', $request->projectCode)
+            )
+        );
 
-        $firstApprovedOrSecondRejectedDatabases->map(function ($database) {
+        $query->when($request->filled('database'), fn($q) =>
+            $q->whereHas('database', fn($d) =>
+                $d->where('name', $request->database)
+            )
+        );
 
-            $database["projectCode"] = Project::find($database["project_id"])->projectCode;
-            $database["province"] = Province::find($database["province_id"])->name;
-            $database["database"] = Database::find($database["database_id"])->name;
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', $request->province)
+            )
+        );
 
-            unset($database["project_id"], $database["database_id"], $database["province_id"]);
+        $query->when($request->filled('fromDate'), fn($q) =>
+            $q->whereDate('fromDate', $request->fromDate)
+        );
+
+        $query->when($request->filled('toDate'), fn($q) =>
+            $q->whereDate('toDate', $request->toDate)
+        );
+
+        $query->when($search = $request->input('search'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$search}%")
+            )
+        );
+
+        $databases = $query->paginate(10);
+
+        if ($databases->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No database was found!",
+                "data" => []
+            ], 200);
+        }
+
+        $databases->getCollection()->transform(function ($database) {
+
+            $tempProject = $database->project;
+            $tempProvince = $database->province;
+            $tempDatabase = $database->database;
+
+            unset($database->project, $database->province, $database->database);
+
+            $database->projectCode = $tempProject?->projectCode;
+            $database->province = $tempProvince?->name;
+            $database->database = $tempDatabase?->name;
 
             return $database;
-
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $firstApprovedOrSecondRejectedDatabases]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $databases
+        ], 200);
     }
 
     public function indexFirstApprovedDatabases ()
     {
-        $approvedDatabases = Apr::where("status", "firstApproved")->orWhere("status", "thirdRejected")->get();
+        $approvedDatabases = Apr::where("status", "firstApproved")->orWhere("status", "thirdRejected")->paginate(10);
 
-        if ($approvedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" stage!', "data" => []], 404);
+        if ($approvedDatabases->isEmpty()) return response()->json(["status" => false, "message" => 'No database was found in the "First Approved" stage!', "data" => []], 200);
 
         $approvedDatabases->map(function ($approvedDatabase) {
 

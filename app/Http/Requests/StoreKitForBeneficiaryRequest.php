@@ -23,9 +23,9 @@ class StoreKitForBeneficiaryRequest extends FormRequest
     {
         return [
             "kitId" => "required|exists:kits,id",
-            "distributionDate" => "required|string",
+            "destribution_date" => "required|string",
             "remark" => "required|string",
-            "isReceived" => "required|boolean"
+            "is_received" => "required|boolean"
         ];
     }
 }

@@ -41,7 +41,7 @@ class IndicatorController extends Controller
         
         $output = Output::find($indicator["outputId"]);
 
-        if (!$output) return response()->json(["status" => false, "message" => "Invalid output ref for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
+        if (!$output) return response()->json(["status" => false, "message" => "Invalid output for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
 
         $database = Database::where("name", $indicator["database"])->first();
         if (!$database) return response()->json(["status" => false, "message" => "Invalid database for indicator with " . $indicator["indicatorRef"] . " reference!"], 404);
@@ -205,7 +205,7 @@ class IndicatorController extends Controller
         if (!$indicator) {
             return response()->json([
                 'status' => false,
-                'message' => 'Indicator not found.'
+                'message' => 'No such indicator in system !'
             ], 404);
         }
 
@@ -321,6 +321,12 @@ class IndicatorController extends Controller
 
                 $subIndicator->provinces()->sync($finalSubData);
             }
+        } else  {
+
+            $subIndicator =Indicator::where("parent_indicator", $id)->first();
+
+            if ($subIndicator) $subIndicator->delete();
+
         }
 
         return response()->json([

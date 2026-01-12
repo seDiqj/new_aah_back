@@ -11,25 +11,78 @@ use App\Models\Province;
 use App\Models\Question;
 use Illuminate\Http\Request;
 
+use function Laravel\Prompts\error;
+
 class EnactController extends Controller
 {
-    public function index () 
+    public function index(Request $request)
     {
-        $enacts = Enact::all();
+        $query = Enact::query()
+            ->with([
+                'project',
+                'province',
+                'indicator',
+            ]);
 
-        if ($enacts->isEmpty()) return response()->json(["status" => false, "message" => 'No assessment was found in system !'], 404);
-        
-        $enacts->map(function ($enact) {
-            $enact["projectCode"] = Project::find($enact["project_id"])->projectCode;
-            $enact["province"] = Province::find($enact["province_id"])->name;
-            $enact["indicatorRef"] = Indicator::find($enact["indicator_id"])->indicatorRef;
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', "like", "%{$request->projectCode}%")
+            )
+        );
 
-            unset($enact["project_id"], $enact["province_id"], $enact["indicator_id"]);
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', 'like', "%{$request->province}%")
+            )
+        );
+
+        $query->when($request->filled('indicator'), fn($q) =>
+            $q->whereHas('indicator', fn($i) =>
+                $i->where('indicatorRef', 'like', "%{$request->indicator}%")
+            )
+        );
+
+        $query->when($request->filled('date'), fn($q) =>
+            $q->where('date', $request->date)
+        );
+
+        $query->when($search = $request->input('search'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$search}%")
+            )
+        );
+
+        $enacts = $query->paginate(10);
+
+        if ($enacts->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => 'No assessment was found !',
+                "data" => []
+            ], 200);
+        }
+
+        $enacts->getCollection()->transform(function ($enact) {
+
+            $tempProvince = $enact->province;
+            $tempProject = $enact->project;
+            $tempIndicator = $enact->indicator;
+
+            unset($enact->project, $enact->province, $enact->indicator);
+
+            $enact->projectCode = $tempProject?->projectCode;
+            $enact->province = $tempProvince?->name;
+            $enact->indicatorRef = $tempIndicator?->indicatorRef;
+
 
             return $enact;
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $enacts]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $enacts
+        ]);
     }
 
     public function indexAssessmentsList ()
@@ -78,7 +131,7 @@ class EnactController extends Controller
 
         unset($enact["project_id"], $enact["indicator_id"], $enact["province_id"]);
 
-        $assessments = $enact->assessments()->select("id")->get();
+        $assessments = $enact->assessments()->select("id", "date")->get();
 
         // if ($assessments->isEmpty()) return response()->json(["status" => false, "message" => "No assess for current assessment !"], 404);
 
@@ -141,14 +194,6 @@ class EnactController extends Controller
 
     }
 
-    public function destroyAssessmentScore (string $id) {
-
-    }
-
-    public function showAssessmentScore (string $id) {
-
-    }
-
     public function destroy (Request $request)
     {
         $validated = $request->validate([
@@ -179,13 +224,8 @@ class EnactController extends Controller
         $enact = Enact::findOrFail($request->enactId);
         $scores = $request->input('scores');
         $date = $request->input("date");
-    
-        $questionIds = array_keys($scores);
-    
-        $count = Question::whereIn('id', $questionIds)->count();
-        if ($count !== count($questionIds)) {
-            return response()->json(['message' => 'Some question IDs are invalid'], 422);
-        }
+        
+        $questionIds = Question::all()->pluck("id");
 
         $assessment = $enact->assessments()->create([
             "totalScore" => 0,
@@ -196,7 +236,7 @@ class EnactController extends Controller
         
         $pivotData = [];
         foreach ($questionIds as $questionId) {
-            $pivotData[$questionId] = ['score' => $scores[$questionId]];
+            $pivotData[$questionId] = ['score' => $scores[$questionId - 1]];
             $totalScore += (int) $scores[$questionId];
         }
 

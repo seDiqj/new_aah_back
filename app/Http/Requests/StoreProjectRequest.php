@@ -18,8 +18,8 @@ class StoreProjectRequest extends FormRequest
     {
         return [
             'projectCode'      => ['required', 'string', 'max:255', Rule::unique('projects', 'projectCode')->whereNull('deleted_at')],
-            'projectTitle'     => 'required|string|max:255',
-            'projectGoal'      => 'required|string|max:255',
+            'projectTitle'     => 'required|string',
+            'projectGoal'      => 'required|string',
             'projectDonor'     => 'required|string|max:255',
             'startDate'        => 'required|date',
             'endDate'          => 'required|date|after_or_equal:startDate',

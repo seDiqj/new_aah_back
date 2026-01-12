@@ -34,10 +34,24 @@ class PermissionController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $grouped]);
     }
 
-    public function indexPermissions()
+    public function indexPermissions(Request $request)
     {
-        $permissions = Permission::orderBy("created_at")
-            ->get(['id', 'name', 'label', 'group_name']);
+
+        $query = Permission::query();
+
+        if ($request->filled("group_name"))
+            $query->where("group_name", $request->group_name);
+
+        if ($search = request('search')) {
+            $query->where('name', 'like', "%$search%");
+        }
+
+        $permissions = $query->orderBy("created_at")
+            ->paginate(10, ['id', 'name', 'label', 'group_name']);
+
+        if ($permissions->isEmpty()) {
+            return response()->json(["status" => false, "message" => "No permissions found !", "data" => []], 200);
+        }
     
         return response()->json(["status" => true, "message" => "", "data" => $permissions]);
     }

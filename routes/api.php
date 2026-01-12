@@ -26,6 +26,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Isp3Controller;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ChatMessageController;
+use App\Http\Controllers\KitController;
+use App\Http\Controllers\SearchController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +53,7 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
     Route::get("/beneficiary/indicators/{id}", [GlobalController::class, "indexBeneficiaryIndicators"]);
     // Programs Routes
     Route::get("/programs/{databaseName}", [ProgramController::class, "index"]);
+    Route::get("/programs_for_selection/{databaseName}", [ProgramController::class, "indexProgramsForSelections"]);
     Route::get("/program/{id}", [ProgramController::class, "show"]);
     Route::post("/program/{databaseName}", [ProgramController::class, "store"]);
     Route::put("/program/{id}", [ProgramController::class, "update"]);
@@ -71,6 +74,7 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
 
     // Indicators routes.
     Route::get("/indicators/{databaseName}", [GlobalController::class, "indexDatabaseIndicators"]);
+    Route::get("/indicators/{programId}/{databaseName}", [GlobalController::class, "indexProjectIndicatorsAccordingToAprogram"]);
 
     // Beneficiary
     Route::post("/beneficiary/change_apr_included/{id}", [GlobalController::class, "changeBeneficiaryAprIncluded"]);
@@ -81,6 +85,7 @@ Route::prefix("global")->name("global.")->middleware(["auth:sanctum"])->group(fu
     Route::get("/project/provinces/{id}", [GlobalController::class, "indexProjectProvinces"]);
 
     Route::get("/databaseBeneficiaries/{id}", [GlobalController::class, "indexDatabaseBeneficiaries"]);
+    Route::get("/getWordsList", [GlobalController::class, "generateWordsList"]);
 });
 
 Route::prefix("projects")->name("projects.")->middleware(["auth:sanctum"])->group(function () {
@@ -139,7 +144,7 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
     Route::get("/beneficiaries", [MainDatabaseController::class, "indexBeneficiaries"])->middleware("permission:Maindatabase.view");
     Route::get("/beneficiary/mealtools/{id}", [MainDatabaseController::class, "indexBeneficiaryMealtools"])->middleware("permission:Maindatabase.view");
     Route::get("/beneficiary/{id}", [MainDatabaseController::class, "showBeneficiary"])->middleware("permission:Maindatabase.view");
-    Route::get("/beneficiary/mealtool/{id}", [MainDatabaseController::class, "indexBeneficiaryMealtools"])->middleware("permission:Maindatabase.view");
+    Route::get("/beneficiary/mealtool/{id}", [MainDatabaseController::class, "showMealtool"])->middleware("permission:Maindatabase.view");
     Route::get("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "showBeneficiaryEvaluation"])->middleware("permission:Maindatabase.view");
     Route::get("/program/{id}", [MainDatabaseController::class, "showBeneficiaryProgram"])->middleware("permission:Maindatabase.view");
     Route::get("/indicators/{id}", [MainDatabaseController::class, "indexIndicators"])->middleware("permission:Maindatabase.view");
@@ -148,7 +153,7 @@ Route::prefix("main_db")->name("mainDb.")->middleware(["auth:sanctum"])->group(f
     Route::post("/beneficiary/mealtools/{id}", [MainDatabaseController::class, "storeMealtool"])->middleware("permission:Maindatabase.create");
     Route::post("/beneficiary/evaluation/{id}", [MainDatabaseController::class, "storeBeneficiaryEvaluation"])->middleware("permission:Maindatabase.create");
     Route::post("/reffer_beneficiary/{id}", [MainDatabaseController::class, "refferBeneficiary"])->middleware("permission:Maindatabase.view");
-    Route::post("/beneficiary/add_to_kit_list/{id}", [MainDatabaseController::class, "addBeneficiaryToKitList"])->middleware("permission:Maindatabase.view");
+    Route::post("/beneficiary/add_to_kit_list", [MainDatabaseController::class, "addBeneficiaryToKitList"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary/includeOrExcludeBeneficiaryToOrFromAPR/{newState}", [MainDatabaseController::class, "includeOrExcludeBeneficiaryToOrFromAPR"])->middleware("permission:Maindatabase.view");
     Route::post("/beneficiary/change_status/{id}", [MainDatabaseController::class, "changeBeneficiaryStatus"])->middleware("permission:Maindatabase.view");
     Route::post("/delete_beneficiaries", [MainDatabaseController::class, "destroyBeneficiary"])->middleware("permission:Maindatabase.delete");
@@ -177,6 +182,14 @@ Route::prefix("kit_db")->name("kit_db.")->middleware(["auth:sanctum"])->group(fu
     Route::put("/beneficiary/{id}", [KitDatabaseController::class, "updateBeneficiary"])->middleware("permission:Kit.edit");
     Route::put("/kit/{id}", [MainDatabaseController::class, "updateKit"])->middleware("permission:Kit.edit");
     Route::post("/delete_beneficiaries", [KitDatabaseController::class, "destroyBeneficiary"])->middleware("permission:Kit.delete");
+
+    Route::prefix("kit_mng")->name("kit_mng.")->group(function () {
+        Route::get("/", [KitController::class, "index"]);
+        Route::get("/{id}", [KitController::class, "show"]);
+        Route::post("/", [KitController::class, "store"]);
+        Route::put("/{id}", [KitController::class, "update"]);
+        Route::post("/delete_kits", [KitController::class, "destroy"]);
+    });
 });
 
 // permissions done need full review
@@ -196,13 +209,18 @@ Route::prefix("community_dialogue_db")->name("community_dialogue_db.")->middlewa
     Route::post("/community_dialogue", [CommunityDialogueDatabaseController::class, "storeCommunityDialogue"])->middleware("permission:Dialogue.create");
     Route::post("/community_dialogue/session", [CommunityDialogueDatabaseController::class, "createNewSession"])->middleware("permission:Dialogue.create");
     Route::post("/beneficiaries/add_community_dialogue", [CommunityDialogueDatabaseController::class, "addCommunityDialogueToBeneficiaries"])->middleware("permission:Dialogue.assign");
+    Route::post("/community_dialogue/create_new_group/{id}", [CommunityDialogueDatabaseController::class, "createNewGroup"]);
     Route::put("/beneficiary/{id}", [CommunityDialogueDatabaseController::class, "updateBeneficiary"])->middleware("permission:Dialogue.edit");
     Route::put("/community_dialogue/{id}", [CommunityDialogueDatabaseController::class, "updateCommunityDialogue"])->middleware("permission:Dialogue.edit");
     Route::put("/community_dialogue/session/{id}", [CommunityDialogueDatabaseController::class, "updateSession"])->middleware("permission:Dialogue.edit");
     Route::post("/delete_beneficiary_sessions/{id}", [CommunityDialogueDatabaseController::class, "destroyBeneficiarySessions"])->middleware("permission:Dialogue.delete");
     Route::post("/delete_cds", [CommunityDialogueDatabaseController::class, "destroyCommunityDialogue"])->middleware("permission:Dialogue.delete");
-    Route::post("/community_dialogue_db/community_dialogue/sessions/delete_sessions", [CommunityDialogueDatabaseController::class, "destroySessions"])->middleware("permission:Dialogue.delete");
+    Route::post("/community_dialogue/sessions/delete_sessions", [CommunityDialogueDatabaseController::class, "destroySessions"])->middleware("permission:Dialogue.delete");
     Route::post("/delete_beneficiaries", [CommunityDialogueDatabaseController::class, "destroyBeneficiaries"])->middleware("permission:Dialogue.delete");
+    Route::post("/remove_beneficiaries/{id}", [CommunityDialogueDatabaseController::class, "removeBeneficiariesFromCd"]);
+    Route::post("/remove_beneficiary/{id}", [CommunityDialogueDatabaseController::class, "removeBeneficiaryFromCd"]);
+    Route::post("/remove_beneficiaries_from_group/{id}", [CommunityDialogueDatabaseController::class, "removeBeneficiariesFromGroup"]);
+    Route::delete("/community_dialogue/group/{id}", [CommunityDialogueDatabaseController::class, "destroyGroup"]);
 });
 
 // permissions done
@@ -219,11 +237,13 @@ Route::prefix("training_db")->name("training_db.")->middleware(["auth:sanctum"])
     Route::get("/trainings", [TrainingController::class, "index"])->middleware("permission:Training.view");
     Route::get("/beneficiaries", [TrainingController::class, "indexBeneficiaries"])->middleware("permission:Training.view");
     Route::get("/beneficiary/trainings/{id}", [TrainingController::class, "indexBeneficiaryTrainings"])->middleware("permission:Training.view");
+    Route::get("/training_beneficiaries/{id}", [TrainingController::class, "indexTrainingBeneficiaries"])->middleware("permission:Training.view");
     Route::get("/trainings/for_selection", [TrainingController::class, "indexTrainingsForSelection"])->middleware("permission:Training.view");
     Route::get("/training/{id}", [TrainingController::class, "show"])->middleware("permission:Training.view");
     Route::get("/training_for_edit/{id}", [TrainingController::class, "showTrainingForEdit"])->middleware("permission:Training.view");
     Route::get("/beneficiary/{id}", [TrainingController::class, "showBeneficiary"])->middleware("permission:Training.view");
     Route::get("/beneficiary/chapter/preAndPostTest/{bnfId}/{chapterId}", [TrainingController::class, "showBeneficiaryChapterPreAndPostTestScores"])->middleware("permission:Training.view");
+    Route::get("/training/chapter/{id}", [TrainingController::class, "showChapter"])->middleware("permission:Training.view");
     Route::post("/training", [TrainingController::class, "store"])->middleware("permission:Training.create");
     Route::post("/beneficiary", [TrainingController::class, "storeNewBeneficiary"])->middleware("permission:Training.create");
     Route::post("/beneficiaries/add_training", [TrainingController::class, "addTrainingToBeneficiaries"])->middleware("permission:Training.assign_training");
@@ -234,29 +254,34 @@ Route::prefix("training_db")->name("training_db.")->middleware(["auth:sanctum"])
     Route::post("/training/chapter/{id}", [TrainingController::class, "storeNewChapter"])->middleware("permission:Training.create");
     Route::post("/delete_trainings", [TrainingController::class, "destroy"])->middleware("permission:Training.delete");
     Route::post("/delete_beneficiaries", [TrainingController::class, "destroyBeneficiaries"])->middleware("permission:Training.delete");
+    Route::post("/remove_beneficiaries_from_training/{id}", [TrainingController::class, "removeBeneficiariesFromTraining"])->middleware("permission:Training.delete");
+    Route::post("/remove_training_from_bnf", [TrainingController::class, "removeTrainingFromBeneficiary"])->middleware("permission:Training.delete");
     Route::post("/training/evaluation/{id}", [TrainingController::class, "storeTrainingEvaluation"])->middleware("permission:Training.create");
+    Route::put("/training/chapter/{id}", [TrainingController::class, "updateChapter"])->middleware("permission:Training.view");
+    Route::delete("/training/chapter/{id}", [TrainingController::class, "destroyChapter"])->middleware("permission:Training.delete");
 });
 
 // permissions done (refferBeneficiary route needs review)
 Route::prefix("referral_db")->name("referral_db.")->middleware(["auth:sanctum"])->group(function () {
     Route::get("/beneficiaries", [ReferralDatabaseController::class, "index"])->middleware("permission:Referral.view");
     Route::get("/beneficiary/{id}", [ReferralDatabaseController::class, "show"])->middleware("permission:Referral.view");
+    Route::get("/indicators", [ReferralDatabaseController::class, "indexRefferalDatabaseIndicators"])->middleware("permission:Referral.view");
+    Route::post("/reffer_beneficiaries", [ReferralDatabaseController::class, "refferBeneficiaries"])->middleware("permission:Referral.view");
     Route::put("/beneficiary/updateReferral/{id}", [ReferralDatabaseController::class, "update"])->middleware("permission:Referral.edit");
     Route::post("/delete_beneficiaries", [ReferralDatabaseController::class, "destroy"])->middleware("permission:Referral.delete");
 });
 
-// Does not have any permissions.
 Route::prefix("enact_database")->name("enact_database.")->middleware(["auth:sanctum"])->group(function () {
-    Route::get("/", [EnactController::class, "index"]);
-    Route::get("/assessments_list", [EnactController::class, "indexAssessmentsList"]);
-    Route::get("/show_for_profile/{id}", [EnactController::class, "showForProfile"]);
-    Route::get("/{id}", [EnactController::class, "show"]);
-    Route::post("/assess_assessment", [EnactController::class, "assessAssessment"]);
-    Route::post("/", [EnactController::class, "store"]);
-    Route::put("/{id}", [EnactController::class, "update"]);
-    Route::get("/assessment/{id}", [EnactController::class, "updateAssessmentScore"]);
-    Route::post("/delete_enacts", [EnactController::class, "destroy"]);
-    Route::delete("/delete_assessment/{id}", [EnactController::class, "destroyAssessment"]);
+    Route::get("/", [EnactController::class, "index"])->middleware("permission:Enact.view");
+    Route::get("/assessments_list", [EnactController::class, "indexAssessmentsList"])->middleware("permission:Enact.view");;
+    Route::get("/show_for_profile/{id}", [EnactController::class, "showForProfile"])->middleware("permission:Enact.view");;
+    Route::get("/{id}", [EnactController::class, "show"])->middleware("permission:Enact.view");;
+    Route::post("/assess_assessment", [EnactController::class, "assessAssessment"])->middleware("permission:Enact.create");;
+    Route::post("/", [EnactController::class, "store"])->middleware("permission:Enact.create");;
+    Route::put("/{id}", [EnactController::class, "update"])->middleware("permission:Enact.edit");;
+    Route::get("/assessment/{id}", [EnactController::class, "updateAssessmentScore"])->middleware("permission:Enact.edit");;
+    Route::post("/delete_enacts", [EnactController::class, "destroy"])->middleware("permission:Enact.delete");;
+    Route::delete("/delete_assessment/{id}", [EnactController::class, "destroyAssessment"])->middleware("permission:Enact.delete");;
 });
 
 // permissions done (need quik review)
@@ -279,12 +304,9 @@ Route::prefix("user_mng")->name("user_mng.")->middleware("auth:sanctum")->group(
     Route::put("/role/{id}", [RoleController::class, "update"])->middleware("permission:Edit Role");
 
     // Permission Routes.
-    Route::get("/permissions", [PermissionController::class, "index"]);
-    Route::get("/table_permissions", [PermissionController::class, "indexPermissions"]);
+    Route::get("/permissions", [PermissionController::class, "index"])->middleware("permission:List Role");
+    Route::get("/table_permissions", [PermissionController::class, "indexPermissions"])->middleware("permission:List Role");
     Route::get("/permissionsForAuth", [PermissionController::class, "indexPermissionsForFrontAuthintication"]);
-    // Route::get("/permission/{id}", [PermissionController::class, "show"]);
-    // Route::post("/permission/delete_permissions", [PermissionController::class, "destroy"]);
-    // Route::put("/permission/{id}", [PermissionController::class, "update"]);
 
     // Roles && Permissions
     Route::get("/permissions_&_roles", [UserController::class, "getAllRolesAndPermissions"]);
@@ -343,6 +365,46 @@ Route::prefix("filter")->name("filter.")->middleware("auth:sanctum")->group(func
     Route::post("/approved_databases", [FilterTablesController::class, "filterApprovedDatabases"])->middleware("permission:List Role");
     Route::post("/reviewed_aprs", [FilterTablesController::class, "filterReviwedAprs"])->middleware("permission:List Role");
     Route::post("/aprroved_aprs", [FilterTablesController::class, "filterApprovedAprs"])->middleware("permission:List Role");
+});
+
+Route::prefix("search")->name("search.")->middleware("auth:sanctum")->group(function () {
+    // Projects
+    Route::post("/projects", [SearchController::class, "projects"]);
+
+    // Main database
+    Route::post("/main_database/beneficiary", [SearchController::class, "mainDbBeneficiaries"]);
+    Route::post("/main_database/program", [SearchController::class, "mainDbProgram"]);
+
+    // Kit database
+    Route::post("/kit_database/beneficiary", [SearchController::class, "kitDbBeneficiaries"]);
+    Route::post("/kit_database/program", [SearchController::class, "kitDbProgram"]);
+    Route::post("/kit_database/kits", [SearchController::class, "kitDbKits"]);
+
+    // Psychoeducation database
+    Route::post("/psychoeducation", [SearchController::class, "psychoeducation"]);
+
+    // Community dialogue database
+    Route::post("/cd_database/beneficiary", [SearchController::class, "cdDbBeneficiaries"]);
+    Route::post("/cd_database/community_dialogues", [SearchController::class, "cdDbCds"]);
+    Route::post("/cd_database/sessions", [SearchController::class, "cdDbCds"]);
+
+    // Training database
+    Route::post("/training_database/beneficiary", [SearchController::class, "trainingDbBeneficiary"]);
+    Route::post("/training_database/trainings", [SearchController::class, "trainings"]);
+
+    // Referal database
+    Route::post("/referal_database/beneficiary", [SearchController::class, "referalDbBeneficiary"]);
+
+    // Enact database
+    Route::post("/enact_database/assessments", [SearchController::class, "assessments"]);
+
+    // Users
+    Route::post("/user_management/users", [SearchController::class, "users"]);
+    Route::post("/user_management/roles", [SearchController::class, "roles"]);
+    Route::post("/user_management/permissions", [SearchController::class, "permissions"]);
+
+    // Database management
+    Route::post("/database_management/submitted_database", [SearchController::class, "submittedDatabase"]);
 });
 
 Route::prefix("notification")->name("filter.")->middleware("auth:sanctum")->group(function () {

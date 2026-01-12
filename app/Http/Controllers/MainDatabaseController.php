@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 
 class MainDatabaseController extends Controller
 {
-    public function indexBeneficiaries() 
+    public function indexBeneficiaries(Request $request) 
     {
 
         $mainDb = Database::where("name", "main_database")->first();
@@ -27,15 +27,92 @@ class MainDatabaseController extends Controller
 
         $mainDbId = $mainDb->id;
 
-        $beneficiaries = Beneficiary::whereHas("programs", function ($query) use ($mainDbId) {
-            $query->where("database_program_beneficiary.database_id", $mainDbId);
-        })->with(["programs" => function ($query) use ($mainDbId) {
-            $query->where("database_program_beneficiary.database_id", $mainDbId)
-                  ->select("programs.id", "name");
-        }])->select("id", "name", "fatherHusbandName", "gender", "age", "code", "phone", "childAge", "childCode", "dateOfRegistration", "maritalStatus", "disabilityType", "householdStatus", "literacyLevel")->get();
+        $query = Beneficiary::query()
+            ->with(['programs.project', 'indicators', 'mealTools']);
 
-        $beneficiaries->map(function ($bnf) {
-            $bnf->programName = $bnf->programs->toArray()[0]["name"];
+        if ($search = request("search")) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        $query->whereHas('programs', function($q) use ($request, $mainDbId) {
+            $q->where('database_program_beneficiary.database_id', $mainDbId);
+
+            if ($request->filled('projectCode')) {
+                $q->whereHas('project', function($q2) use ($request) {
+                    $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                });
+            }
+
+            if ($request->filled('focalPoint')) {
+                $q->where('focalPoint', $request->focalPoint);
+            }
+
+            if ($request->filled('province')) {
+                $q->whereHas("province", function ($q3) use ($request) {
+                    $q3->where("name", "like", "%" . $request->province . "%");
+                });
+            }
+
+            if ($request->filled('siteCode')) {
+                $q->where('siteCode', $request->siteCode);
+            }
+
+            if ($request->filled('healthFacilitator')) {
+                $q->where('healthFacilityName', 'like', '%' . $request->healthFacilitator . '%');
+            }
+        });
+
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', $request->dateOfRegistration);
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', $request->age);
+        }
+
+        if ($request->filled('maritalStatus')) {
+            $query->where('maritalStatus', $request->maritalStatus);
+        }
+
+        if ($request->filled('householdStatus')) {
+            $query->where('householdStatus', 'like', '%' . $request->householdStatus . '%');
+        }
+
+        if ($request->filled('baselineDate')) {
+            $query->whereHas('mealTools', function($q) use ($request) {
+                $q->where('baselineDate', $request->baselineDate);
+            });
+        }
+
+        if ($request->filled('endlineDate')) {
+            $query->whereHas('mealTools', function($q) use ($request) {
+                $q->where('endlineDate', $request->endlineDate);
+            });
+        }
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicators', function($q) use ($request) {
+                $q->where('indicator', 'like', '%' . $request->indicator . '%');
+            });
+        }
+
+        if ($request->filled('code')) {
+            $query->where("code", "like", "%" . $request->code . "%");
+        }
+
+
+        $beneficiaries = $query->paginate(10);
+
+        if ($beneficiaries->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No beneficiary was found !",
+                "data" => [],
+            ], 200);
+        }
+
+        $beneficiaries->getCollection()->transform(function ($bnf) {
+            $bnf->programName = optional($bnf->programs->first())->name;
             unset($bnf->programs);
             return $bnf;
         });
@@ -51,7 +128,7 @@ class MainDatabaseController extends Controller
 
         $mealtools = $beneficiary->mealTools;
 
-        if ($mealtools->isEmpty()) return response()->json(["status" => false, "message" => "No mealtools found for current beneficiary !"], 404);
+        if ($mealtools->isEmpty()) return response()->json(["status" => false, "message" => "No mealtools found for current beneficiary !", "data" => []], 200);
 
         $mealtools = $mealtools->map(function ($mealtool) {
             if ($mealtool->isBaselineActive) 
@@ -97,7 +174,7 @@ class MainDatabaseController extends Controller
         if (!$project) {
             return response()->json([
                 "status" => false,
-                "message" => "The program does not have a linked project !"
+                "message" => "The program does not have a valid linked project !"
             ], 404);
         }
 
@@ -105,6 +182,7 @@ class MainDatabaseController extends Controller
             ->flatMap(fn($outcome) => $outcome->outputs)
             ->flatMap(fn($output) => 
                 $output->indicators()
+                    ->where("database_id", $mainDatabase->id)
                     ->with([
                         "sessions" => function ($query) use ($id) {
                             $query->where("beneficiary_id", $id);
@@ -135,13 +213,13 @@ class MainDatabaseController extends Controller
 
         $beneficiary = Beneficiary::find($id);
 
-        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !", "data" => []], 404);
 
         foreach ($indicators as $indicator) {
 
             $indicatorFromDb = Indicator::find($indicator["id"]);
 
-            if (!$indicator) return response()->json(["status" => false, "message" => "The indicator with referance " . $indicator["indicatorRef"] . " is not a valid indicator"], 404);
+            if (!$indicatorFromDb) return response()->json(["status" => false, "message" => "The indicator with referance " . $indicator["indicatorRef"] . " is not a valid indicator"], 404);
 
             foreach ($indicator["sessions"] as $session) {
 
@@ -159,12 +237,14 @@ class MainDatabaseController extends Controller
 
             if (count($indicator["sessions"]) >= 1) {
                 $beneficiary->indicators()->syncWithoutDetaching([$indicator["id"]]);
+
+                $subIndicator = Indicator::where("parent_indicator", $indicator["id"])->first();
+
+                if ($subIndicator)
+                    $beneficiary->indicators()->syncWithoutDetaching([$subIndicator->id]);
             }
 
-            $subIndicator = Indicator::where("parent_indicator", $indicator["id"])->first();
-
-            if ($subIndicator)
-                $beneficiary->indicators()->syncWithoutDetaching([$subIndicator->id]);
+            
 
         }
 
@@ -198,13 +278,11 @@ class MainDatabaseController extends Controller
 
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
 
-        $mealtools = $request->input("mealtools");
+        $mealtool = $request->input("mealtool");
 
-        foreach ($mealtools as $mealtool) {
-            $beneficiary->mealTools()->create($mealtool);
-        }
+        $createdMealtool = $beneficiary->mealTools()->create($mealtool);
 
-        return response()->json(["status" => true, "message" => "Mealtools successfully assigned to beneficiary !"], 200);
+        return response()->json(["status" => true, "message" => "Mealtools successfully assigned to beneficiary !", "data" => $createdMealtool], 200);
     }
 
     public function storeBeneficiaryEvaluation (Request $request, string $id)
@@ -273,6 +351,16 @@ class MainDatabaseController extends Controller
 
     }
 
+    public function showMealtool (string $id) {
+
+        $mealTool = MealTool::find($id);
+
+        if (!$mealTool) return response()->json(["status" => false, "message" => "No such mealtool in system !", "data" => []], 404);
+
+        return response()->json(["status" => true, "message" => "", "data" => $mealTool], 200);
+
+    }
+
     public function updateBeneficiary(Request $request, string $id) {
 
         $mainDatabaseFromDb = Database::where("name", "main_database")->first();
@@ -296,10 +384,6 @@ class MainDatabaseController extends Controller
 
     }
 
-    public function updateMealtool(Request $request, string $id) {}
-
-    public function updateBeneficiaryEvaluation(Request $request, string $id) {}
-
     public function updateKit (Request $request, string $id)
     {
         $kitDestribution = KitDistribution::find($id);
@@ -317,6 +401,23 @@ class MainDatabaseController extends Controller
 
         return response()->json(["status" => true, "message" => "Kit successfully updated !"]);
         
+    }
+
+    public function updateMealtool (Request $request, string $id)
+    {
+
+        $mealTool = MealTool::find($id);
+
+        if (!$mealTool)
+            return response()->json(["status" => false, "message" => "No such mealtool in system !", "data" => []], 404);
+
+
+        $mt = $request->all();
+
+        $mealTool->update($mt);
+
+        return response()->json(["status" => true, "message" => "Mealtool successfully updated !", "data" => []], 200);
+
     }
 
     public function destroyBeneficiary(Request $request) {
@@ -377,11 +478,41 @@ class MainDatabaseController extends Controller
         return response()->json(["status" => true, "message" => (string) count($beneficiaries) . " added to referral !"], 200);
     }
 
-    public function addBeneficiaryToKitList(string $id) {}
+    public function addBeneficiaryToKitList(Request $request) {
+
+        $request->validate([
+            "program" => "required|integer|exists:programs,id",
+            "indicator" => "required|integer|exists:indicator,id",
+            "ids" => "required|array",
+            "ids.*" => "integer|exists:beneficiaries,id"
+        ]);
+
+        $beneficiaries = Beneficiary::whereIn("id", $request->input("ids"))->get();
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No such beneficiaries in system !", "data" => []], 404);
+
+        $kitDbId = Database::where("name", "kit_database")->first()->id;
+
+        $indicators = $request->input("indicators");
+
+        if (!$kitDbId) 
+                return response()->json(["status" => false, "message" => "Kit database is not a valid database !", "data" => []], 404);
+
+        foreach ($beneficiaries as $beneficiary) {
+
+            $beneficiary->programs()->syncWithoutDetaching($request->input("program"), [
+                "database_id" => $kitDbId
+            ]);
+
+            $beneficiary->indicators()->sync($indicators);
+
+        }
+
+        return response()->json(["status" => true, "message" => "Beneficiaries successfully added to kit list !", "data" => []], 200);
+    }
 
     public function changeBeneficiaryStatus(string $id) {}
 
     public function includeOrExcludeBeneficiaryToOrFromAPR(string $newState) {}
 
-    public function changeIndicatorStatus(string $id) {}
 }

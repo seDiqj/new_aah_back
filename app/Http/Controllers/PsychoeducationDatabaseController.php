@@ -11,22 +11,99 @@ use Illuminate\Http\Request;
 
 class PsychoeducationDatabaseController extends Controller
 {
-    public function index () 
+    public function index(Request $request)
     {
-        $psychoeducations = Psychoeducations::select("id", "program_id", "indicator_id", "awarenessTopic", "awarenessDate")->get();
+        $psychoeducationDatabaseID = Database::where('name', 'psychoeducation_database')->value('id');
 
-        if ($psychoeducations->isEmpty()) return response()->json(["status" => false, "message" => "No psychoeducation found !"], 404);
+        if (!$psychoeducationDatabaseID) {
+            return response()->json([
+                "status" => false,
+                "message" => "psychoeducation database not found",
+                "data" => [],
+            ], 404);
+        }
 
-        $psychoeducations->map(function ($p) {
-            $p["programName"] = Program::find($p["program_id"])->name;
-            $p["indicator"] = Indicator::find($p["indicator_id"])->indicatorRef;
+        $query = Psychoeducations::query()
+            ->with([
+                'indicator',
+                'program' => function ($q) use ($psychoeducationDatabaseID, $request) {
+                    $q->where('database_id', $psychoeducationDatabaseID)
+                    ->with(['project', 'province', 'district'])
 
-            unset($p["program_id"], $p["indicator_id"]);
+                    ->when($request->filled('projectCode'),
+                        fn ($x) => $x->whereHas('project',
+                            fn ($p) => $p->where('projectCode', 'like', "%{$request->projectCode}%")
+                        )
+                    )
 
-            return $p;
+                    ->when($request->filled('focalPoint'),
+                        fn ($x) => $x->where('focalPoint', $request->focalPoint)
+                    )
+
+                    ->when($request->filled('province'),
+                        fn ($x) => $x->whereHas('province',
+                            fn ($p) => $p->where('name', $request->province)
+                        )
+                    )
+
+                    ->when($request->filled('siteCode'),
+                        fn ($x) => $x->where('siteCode', $request->siteCode)
+                    )
+
+                    ->when($request->filled('healthFacilityName'),
+                        fn ($x) => $x->where('healthFacilityName', 'like', "%{$request->healthFacilityName}%")
+                    )
+
+                    ->when($request->filled('interventionModality'),
+                        fn ($x) => $x->where('interventionModality', 'like', "%{$request->interventionModality}%")
+                    );
+                }
+            ])
+            ->whereHas('program', fn ($q) =>
+                $q->where('database_id', $psychoeducationDatabaseID)
+            );
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicator', function ($q) use ($request) {
+                $q->where('indicatorRef', 'like', "%{$request->indicator}%");
+            });
+        }
+
+        if ($request->filled('awarenessDate')) {
+            $query->where('awarenessDate', $request->awarenessDate);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where("awarenessTopic", "like", "%{$search}%");
+        }
+
+        $psychoeducations = $query->paginate(10);
+
+        if ($psychoeducations->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No psychoeducation found!",
+                "data" => [],
+            ], 200);
+        }
+
+        $psychoeducations->getCollection()->transform(function ($p) {
+            return [
+                "id" => $p->id,
+                "programName" => $p->program?->name,
+                "projectCode" => $p->program?->project?->projectCode,
+                "province" => $p->program?->province?->name,
+                "district" => $p->program?->district?->name,
+                "indicator" => $p->indicator?->indicatorRef,
+                "awarenessDate" => $p->awarenessDate,
+            ];
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $psychoeducations]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $psychoeducations
+        ]);
     }
 
     public function store (PsychoeducationFormRequest $request)

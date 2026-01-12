@@ -2,17 +2,23 @@
 
 namespace App\Models;
 
+use App\Traits\CascadeAllDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Output extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, CascadeAllDeletes;
 
     protected $fillable = 
     [
         'output',
         'outputRef',
         'outcome_id',
+    ];
+
+    protected $cascadeDeletes = [
+        'indicators',
     ];
 
     public function outcome()

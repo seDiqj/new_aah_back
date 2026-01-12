@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 
 class KitDatabaseController extends Controller
 {
-    public function indexBeneficiaries() {
+    public function indexBeneficiaries(Request $request) {
 
         $kitDb = Database::where("name", "kit_database")->first();
 
@@ -24,20 +24,77 @@ class KitDatabaseController extends Controller
 
         $kitDbId = $kitDb->id;
 
-        $beneficiaries = Beneficiary::whereHas("programs", function ($query) use ($kitDbId) {
-            $query->where("database_program_beneficiary.database_id", $kitDbId);
-        })->with(["programs" => function ($query) use ($kitDbId) {
-            $query->where("database_program_beneficiary.database_id", $kitDbId)
-                  ->select("programs.id", "name");
-        }])->get();
+        $query = Beneficiary::query()->with(["programs", "indicators"]);
+
+        $query->whereHas("programs", function ($q) use ($kitDbId, $request) {
+            $q->where("database_program_beneficiary.database_id", $kitDbId);
+
+            if ($request->filled("projectCode")) {
+                $q->whereHas("project", function ($q2) use ($request) {
+                    $q2->where("projectCode", "like", "%" . $request->projectCode . "%");
+                });
+            }
+
+            if ($request->filled('focalPoint')) {
+                $q->where('focalPoint', $request->focalPoint);
+            }
+
+            if ($request->filled('province')) {
+                $q->where('province_id', $request->province);
+            }
+
+            if ($request->filled('siteCode')) {
+                $q->where('siteCode', $request->siteCode);
+            }
+
+            if ($request->filled('healthFacilitator')) {
+                $q->where('healthFacilityName', 'like', '%' . $request->healthFacilitator . '%');
+            }
+
+        });
+
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', $request->dateOfRegistration);
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', $request->age);
+        }
+
+        if ($request->filled('maritalStatus')) {
+            $query->where('maritalStatus', $request->maritalStatus);
+        }
+
+        if ($request->filled('householdStatus')) {
+            $query->where('householdStatus', 'like', '%' . $request->householdStatus . '%');
+        }
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicators', function($q) use ($request) {
+                $q->where('indicator', 'like', '%' . $request->indicator . '%');
+            });
+        }
+
+        if ($search = request("search")) {
+
+            $query->where("name", "like", "%" . $search . "%" );
+
+        }
+
+        if ($request->filled('code')) {
+            $query->where("code", "like", "%" . $request->code . "%");
+        }
+
+        $beneficiaries = $query->paginate(10);
         
-        $beneficiaries = $beneficiaries->map(function ($beneficiary) {
-            $beneficiary->programName = $beneficiary->programs->toArray()[0]["name"];
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary was found !", "data" => []], 200);
+        
+        $beneficiaries->getCollection()->transform(function ($beneficiary) {
+            $beneficiary->programName =  optional($beneficiary->programs->first())->name;
             unset($beneficiary->programs);
             return $beneficiary;
         });
         
-
         return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
 
     }
@@ -50,7 +107,8 @@ class KitDatabaseController extends Controller
 
         $kits = $beneficiary->kits;
 
-        if ($kits->isEmpty()) return response()->json(["status" => true, "message" => "No kit found for selected beneficiary !"], 404);
+        if ($kits->isEmpty()) 
+            return response()->json(["status" => true, "message" => "No kit found for selected beneficiary !", "data" => []], 200);
 
         $manipulatedKits = $kits->map(function ($kit) {
             return [
@@ -70,7 +128,7 @@ class KitDatabaseController extends Controller
     {
         $kits = Kit::select("id", "name")->get();
 
-        if ($kits->isEmpty()) return response()->json(["status" => false, "message" => "No kit in system !"], 404);
+        if ($kits->isEmpty()) return response()->json(["status" => false, "message" => "No kit in system !", "data" => []], 200);
 
         return response()->json(["status" => true, "message" => "", "data" => $kits]);
     }
@@ -85,9 +143,9 @@ class KitDatabaseController extends Controller
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
 
         $beneficiary->kits()->attach($request->kitId, [
-            "destribution_date" => $validated["distributionDate"],
+            "destribution_date" => $validated["destribution_date"],
             "remark" => $validated["remark"],
-            "is_received" => $validated["isReceived"]
+            "is_received" => $validated["is_received"]
         ]);
 
         return response()->json(["status" => true, "message" => "Kit successfully added !"], 200);
@@ -113,6 +171,9 @@ class KitDatabaseController extends Controller
         $beneficiary->indicators()->sync($indicators);
 
         $kitDbId = Database::where("name", "kit_database")->first()->id;
+
+        if (!$kitDbId) 
+                return response()->json(["status" => false, "message" => "Kit database is not a valid database !", "data" => []], 404);
 
         $beneficiary->programs()->attach($request->input("program"), [
             "database_id" => $kitDbId
@@ -165,16 +226,13 @@ class KitDatabaseController extends Controller
 
         $data = $beneficiary->toArray();
 
-        // indicators به آرایه ساده تبدیل می‌شوند
-        $data['indicators'] = $beneficiary->indicators->pluck('indicator')->toArray();
+        $data['indicators'] = $beneficiary->indicators->pluck("id")->toArray();
 
-        // programs هم به آرایه ساده با id و name
-        $data['programs'] = $beneficiary->programs->map(function($program) {
+        $data['program'] = $beneficiary->programs->map(function($program) {
             return [
                 'id' => $program->id,
-                'name' => $program->name,
             ];
-        })->toArray();
+        })->toArray()[0]["id"];
 
         return response()->json([
             "status" => true,
@@ -236,7 +294,7 @@ class KitDatabaseController extends Controller
 
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
 
-        $beneficiary->update($request->input("bnfData"));
+        $beneficiary->update($request->all());
 
         $beneficiary->indicators()->sync($request->input("indicators"));
 

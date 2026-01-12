@@ -11,37 +11,122 @@ use App\Models\Database;
 use App\Models\Province;
 use App\Models\AprLog;
 use Illuminate\Support\Facades\Auth;
+use App\Jobs\GenerateApr;
 
 
 
 class AprController extends Controller
 {
 
-    public function indexReviewedAprs ()
+    public function indexReviewedAprs(Request $request)
     {
-        $aprs = Apr::where("status", "reviewed")->orWhere("status", "secondApproved")->get();
+        $query = Apr::query()
+            ->with(['project', 'province', 'database'])
+            ->whereIn('status', ['reviewed', 'secondApproved']);
 
-        if ($aprs->isEmpty()) return response()->json(["status" => false, "message" => "No apr with status reviewed was found !"], 404);
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$request->projectCode}%")
+            )
+        );
 
-        $aprs->map(function ($reviewedApr) {
+        $query->when($request->filled('database'), fn($q) =>
+            $q->whereHas('database', fn($d) =>
+                $d->where('name', 'like', "%{$request->database}%")
+            )
+        );
 
-            $reviewedApr["projectCode"] = Project::find($reviewedApr["project_id"])->projectCode;
-            $reviewedApr["province"] = Province::find($reviewedApr["province_id"])->name;
-            $reviewedApr["database"] = Database::find($reviewedApr["database_id"])->name;
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', 'like', "%{$request->province}%")
+            )
+        );
 
-            unset($reviewedApr["project_id"], $reviewedApr["database_id"], $reviewedApr["province_id"]);
+        $query->when($request->filled('fromDate'), fn($q) =>
+            $q->whereDate('fromDate', $request->fromDate)
+        );
 
-            return $reviewedApr;
+        $query->when($request->filled('toDate'), fn($q) =>
+            $q->whereDate('toDate', $request->toDate)
+        );
 
+        $query->when($search = $request->input('search'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$search}%")
+            )
+        );
+
+        $aprs = $query->paginate(10);
+
+        if ($aprs->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No APR was found!",
+                "data" => []
+            ], 200);
+        }
+
+        $aprs->getCollection()->transform(function ($apr) {
+
+            $tempProject = $apr->project;
+            $tempProvince = $apr->province;
+            $tempDatabase = $apr->database;
+
+            unset($apr->project, $apr->province, $apr->database);
+            
+            $apr->projectCode = $tempProject?->projectCode;
+            $apr->province = $tempProvince?->name;
+            $apr->database = $tempDatabase?->name;
+
+            return $apr;
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $aprs]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $aprs
+        ]);
     }
 
-    public function indexGeneratedAprs () {
-        $aprs = Apr::where("status", "fourthRejected")->orWhere("status", "aprGenerated")->get();
+    public function indexGeneratedAprs (Request $request) {
 
-        if ($aprs->isEmpty()) return response()->json(["status" => false, "message" => "No apr with status Apr Generated was found !"], 404);
+        $query = Apr::query()->where("status", "fourthRejected")->orWhere("status", "aprGenerated");
+
+        $query->when($request->filled('projectCode'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$request->projectCode}%")
+            )
+        );
+
+        $query->when($request->filled('database'), fn($q) =>
+            $q->whereHas('database', fn($d) =>
+                $d->where('name', 'like', "%{$request->database}%")
+            )
+        );
+
+        $query->when($request->filled('province'), fn($q) =>
+            $q->whereHas('province', fn($p) =>
+                $p->where('name', 'like', "%{$request->province}%")
+            )
+        );
+
+        $query->when($request->filled('fromDate'), fn($q) =>
+            $q->whereDate('fromDate', $request->fromDate)
+        );
+
+        $query->when($request->filled('toDate'), fn($q) =>
+            $q->whereDate('toDate', $request->toDate)
+        );
+
+        $query->when($search = $request->input('search'), fn($q) =>
+            $q->whereHas('project', fn($p) =>
+                $p->where('projectCode', 'like', "%{$search}%")
+            )
+        );
+
+        $aprs = $query->paginate(10);
+
+        if ($aprs->isEmpty()) return response()->json(["status" => false, "message" => "No apr was found !", "data" => []], 200);
 
         $aprs->map(function ($reviewedApr) {
 
@@ -63,20 +148,29 @@ class AprController extends Controller
 
         $apr = Apr::find($id);
 
-        if (!$apr || $apr->status != "firstApproved") return response()->json(["status" => false, "message" => "No such database to generat apr !"], 404);
-
-        $instance = new AprGeneratorController();
+        if (!$apr || ($apr->status != "firstApproved" && $apr->status != "thirdRejected")) return response()->json(["status" => false, "message" => "No such database to generat apr !"], 404);
 
         $apr->status = 'aprGenerated';
         $apr->save();
 
-        return $instance->generate(
+        AprLog::create([
+            "apr_id" => $apr->id,
+            "user_id" => Auth::id(),
+            "action" => "aprGenerated",
+            "comment" => $validated["comment"] ?? null
+        ]);
+
+
+        GenerateApr::dispatch(
             $apr->project_id,
             $apr->database_id,
             $apr->province_id,
             $apr->fromDate,
-            $apr->toDate
+            $apr->toDate,
+            Auth::id()
         );
+
+        return response()->json(["status" => true, "message" => "Thanks! The system will notify you when the process is done.", "data" => []], 200);
 
     }
 
@@ -84,7 +178,7 @@ class AprController extends Controller
 
         $apr = Apr::find($id);
 
-        if (!$apr || ($apr->status != "aprGenerated" && $apr->status != "secondApproved" && $apr->status != "fourthRejected")) return response()->json(["status" => false, "message" => "No such database for reviewing !"], 404);
+        if (!$apr || ($apr->status != "aprGenerated" && $apr->status != "secondApproved" && $apr->status != "fourthRejected" && $apr->status != "reviewed")) return response()->json(["status" => false, "message" => "No such database for reviewing !"], 404);
 
         $instance = new AprGeneratorController();
 
@@ -100,9 +194,6 @@ class AprController extends Controller
         $numberOfAprsWithSpicificStatus = $aprs->map(function ($item) {
             return $item->status;
         })->countBy();
-        
-        $projectsCount = Project::all()->count();
-
 
         return response()->json(["status" => true, "data" => $numberOfAprsWithSpicificStatus], 200); 
 
@@ -168,7 +259,14 @@ class AprController extends Controller
         $apr->status = "thirdRejected";
         $apr->save();
 
-        $correspondingAprLogInAprGeneratedStage = AprLog::where("action", "secondApproved")->where("apr_id", $id)->first();
+        AprLog::create([
+            "apr_id" => $apr->id,
+            "user_id" => Auth::id(),
+            "action" => "thirdRejected",
+            "comment" => $validated["comment"] ?? null
+        ]);
+
+        $correspondingAprLogInAprGeneratedStage = AprLog::where("action", "aprGenerated")->where("apr_id", $id)->first();
 
         if (!$correspondingAprLogInAprGeneratedStage)
             return response()->json(["status" => false, "message" => "The system could not find the selected APR log in the first approved stage, so it cannot notify anyone to check it!"]);
@@ -186,7 +284,9 @@ class AprController extends Controller
         ]);
 
         $firstApprover->notifications()->attach($notification->id, ["readAt" => false]);
-        event(new MessageSent($firstApprover->id, "The apr that you approved has been rejected by " . Auth::user()->name . " check it now !"));
+        event(new MessageSent($firstApprover->id, "The apr that you approved has been rejected by " . Auth::user()?->name ?? "Unkown User" . " check it now !"));
+
+        return response()->json(["status" => true, "message" => "Apr status changed to rejected !"], 200);
     }
 
     public function approveApr(Request $request, string $id)

@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
+use App\Generators\DtoGenerator;
+use App\Helpers\LogHelpers;
 use App\Http\Requests\StoreProjectRequest;
 use App\Models\Apr;
+use App\Models\Beneficiary;
 use App\Models\Database;
 use App\Models\Dessaggregation;
 use App\Models\Enact;
@@ -16,8 +19,11 @@ use App\Models\Output;
 use App\Models\Project;
 use App\Models\ProjectLogs;
 use App\Models\Province;
+use App\Models\Referral;
 use App\Models\Sector;
+use App\Models\Training;
 use App\Models\User;
+use App\Services\ProjectService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -25,14 +31,78 @@ use Carbon\Carbon;
 
 class ProjectsController extends Controller
 {
-    public function indexProjects() 
+    public function indexProjects(Request $request,DtoGenerator $dtoGenerator, ProjectService $service) 
     {
-        $projects = Project::all();
 
-        if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No project available in database records", "data" => []], 404);
+        $dto = $dtoGenerator->generateIndexProjectDto($request);
+
+        $projects = $service->getProjects($dto);
 
         return response()->json(["status" => true, "message" => "", "data" => $projects]);
     }
+
+    // public function indexProjects(Request $request) 
+    // {
+    //     $query = Project::query();
+
+    //     if ($search = request("search")) {
+    //         $query->where("projectCode", "like", "%" . $search . "%");
+    //     }
+
+    //     if ($request->filled('projectCode')) {
+    //         $query->where('projectCode', 'like', '%' . $request->projectCode . '%');
+    //     }
+
+    //     // projectManager
+    //     if ($request->filled('projectManager')) {
+    //         $query->where('projectManager', $request->projectManager);
+    //     }
+
+    //     // startDate - endDate
+    //     if ($request->filled('startDate') && $request->filled('endDate')) {
+
+    //         $query->whereBetween('startDate', [$request->startDate, $request->endDate]);
+
+    //     } elseif ($request->filled('startDate')) {
+
+    //         $query->where('startDate', '>=', $request->startDate);
+
+    //     } elseif ($request->filled('endDate')) {
+
+    //         $query->where('endDate', '<=', $request->endDate);
+            
+    //     }
+
+    //     if ($request->filled('reportingDate')) {
+    //         $query->where('reportingDate', $request->reportingDate);
+    //     }
+
+    //     if ($request->filled('status')) {
+    //         $query->where('status', $request->status);
+    //     }
+
+    //     if ($request->filled('aprStatus')) {
+    //         $query->where('aprStatus', $request->aprStatus);
+    //     }
+
+    //     if ($request->filled('projectTitle')) {
+    //         $query->where('projectTitle', 'like', '%' . $request->projectTitle . '%');
+    //     }
+
+    //     if ($request->filled('projectDonor')) {
+    //         $query->where('projectDonor', 'like', '%' . $request->projectDonor . '%');
+    //     }
+
+    //     if ($request->filled('projectGoal')) {
+    //         $query->where('projectGoal', 'like', '%' . $request->projectGoal . '%');
+    //     }
+
+    //     $projects = $query->paginate(10);
+
+    //     if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No project available in database records", "data" => []], 200);
+
+    //     return response()->json(["status" => true, "message" => "", "data" => $projects]);
+    // }
 
     public function indexProjectsThatHasAtleastOneIndicatorWhichBelongsToSpicificDatabase(string $databaseName)
     {
@@ -52,12 +122,13 @@ class ProjectsController extends Controller
             $query->where('database_id', $database->id);
         }])
         ->where("aprStatus", "hqFinalized")
+        ->where("status", "ongoing")
         ->get();
 
         if ($projects->isEmpty()) {
             return response()->json([
                 "status" => false,
-                "message" => "No projects was found with indicators in database " . strtoupper(join(" ", explode("_", $databaseName))) . " Note: A project should have at least one indicator which belongs to " . $databaseName . " and also it has to be finalized at HQ level to be listed in MYSPACE section."
+                "message" => "No projects was found with indicators in database " . strtoupper(join(" ", explode("_", $databaseName))) . " Note: A project should have at least one indicator which belongs to " . $databaseName . " and also it has to be finalized at HQ level and with on going status to be listed in MYSPACE section."
             ], 404);
         }
 
@@ -175,7 +246,7 @@ class ProjectsController extends Controller
 
         $logs = $project->logs;
 
-        if ($logs->isEmpty()) return response()->json(["status" => false, "message" => "No log was found for project " . $project->projectCode], 404);
+        if ($logs->isEmpty()) return response()->json(["status" => false, "message" => "No log was found for project " . $project->projectCode, "data" => []], 200);
 
         $logs = $logs->map(function ($log) use ($project) {
             $log["projectCode"] = $project->projectCode;
@@ -193,13 +264,9 @@ class ProjectsController extends Controller
     public function indexProjectsForSubmitting()
     {
 
-
-        error_log("project");
         $projects = Project::where("aprStatus", "hqFinalized")->select("id", "projectCode")->get();
 
-        if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No projects found for submitting \n Note: A project should be finalized by HQ to select for submitting process !"], 404);
-
-        error_log("omdsa");
+        if ($projects->isEmpty()) return response()->json(["status" => false, "message" => "No projects found for submitting \n Note: A project should be finalized by HQ to select for submitting process !", "data" => []], 404);
 
         return response()->json(["status" => true, "message" => "", "data" => $projects]);
 
@@ -207,7 +274,6 @@ class ProjectsController extends Controller
 
     public function indexProjectNecessaryDataForSubmition (string $id)
     {
-
         $project = Project::find($id);
 
         if (!$project) return response()->json(["status" => false, "message" => "No such project in system"], 404);
@@ -215,7 +281,7 @@ class ProjectsController extends Controller
         $projectProvinces = $project->provinces;
 
         $projectProvinces = $projectProvinces->map(function ($province) {
-            unset($province["pivot"]);
+            unset($province->pivot);
             return $province;
         });
 
@@ -226,14 +292,44 @@ class ProjectsController extends Controller
         if (Enact::where("project_id", $project->id)->first())
         {
             $enactDatabase = Database::where("name", "enact_database")->first();
-            $enactDatabaseData = [
-                "id" => $enactDatabase->id,
-                "name" => $enactDatabase->name,
-            ];
-
-            $projectDatabases->push($enactDatabase);
+            
+            if ($enactDatabase)
+                $projectDatabases->push($enactDatabase);
 
         }
+        
+        if (Training::where("project_id", $project->id)->first()) {
+
+            $trainingDatabase = Database::where("name", "training_database")->first();
+            if ($trainingDatabase)
+                $projectDatabases->push($trainingDatabase);
+
+        }
+
+        if (Referral::whereHas("indicator", function ($q) use ($project) {
+            $q->whereHas("output", function ($q2) use ($project) {
+                $q2->whereHas("outcome", function ($q3) use ($project) {
+                    $q3->where("project", function ($q4) use ($project) {
+                        $q4->where("project.id", $project->id);
+                    });
+                });
+            });
+        })) {
+
+            $refferalDatabase = Database::where("name", "refferal_database")->first();
+            if ($refferalDatabase)
+                $projectDatabases->push($refferalDatabase);
+
+        }
+
+        if (Beneficiary::whereHas("mealTools")->first()) {
+
+            $mainDatabaseTargetMealtool = Database::where("name", "main_database_meal_tool")->first();
+            if ($mainDatabaseTargetMealtool)
+                $projectDatabases->push($mainDatabaseTargetMealtool);
+
+        }
+
         $finalData = [
             "provinces" => $projectProvinces,
             "databases" => $projectDatabases,
@@ -281,7 +377,18 @@ class ProjectsController extends Controller
 
         $project->provinces()->sync($provinceIds);
 
-        return response()->json(["status" => true, "message" => "Project successfully created !", "data" => $project], 200);
+        $outcome = Outcome::create([
+            "project_id" => $project->id,
+            "outcome" => "$ NO-OUTCOME#NO-OUTCOME $",
+            "outcomeRef" => "$ NO-OUTCOME-REF#NOOUTCOME-REF $"
+        ]);
+
+        $finalData = [
+            "project" => $project,
+            "outcome" => $outcome
+        ];
+
+        return response()->json(["status" => true, "message" => "Project successfully created !", "data" => $finalData], 200);
     }
     
     public function showProject(string $id) {
@@ -522,7 +629,6 @@ class ProjectsController extends Controller
         return response()->json(["status" => true, "message" => "Project successfully deleted!"], 200);
     }
 
-
     public function destroySubmittedDatabase (Request $request)
     {
         $request->validate([
@@ -749,7 +855,7 @@ class ProjectsController extends Controller
             return [
                 'user_id' => $log->user_id,
                 'name' => $log->user ? $log->user->name : null,
-                'avatar' => $log->user ? url("storage/" . $log->user->photo_path) : null, // <<< اینجا
+                'avatar' => $log->user ? url("storage/" . $log->user->photo_path) : null,
                 'action' => $log->action,
                 'comment' => $log->comment,
                 'result' => $log->result,

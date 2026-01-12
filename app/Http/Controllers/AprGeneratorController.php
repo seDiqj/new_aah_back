@@ -19,6 +19,16 @@ class AprGeneratorController extends Controller
 {
     use AprToolsTrait;
 
+    /**
+     * Main method to generate every single database apr.
+     *
+     * @param string $projectId
+     * @param string $databaseId
+     * @param string $provinceId
+     * @param string $fromDate
+     * @param string $toDate
+     * @return void
+     */
     public function generate(string $projectId, string $databaseId, string $provinceId, string $fromDate, string $toDate)
     {
         $project = Project::with("outcomes.outputs.indicators.dessaggregations")->find($projectId);
@@ -38,22 +48,19 @@ class AprGeneratorController extends Controller
 
         $projectIndicators = $this->projectIndicatorsToASpicificDatabase($project, $databaseId);
 
-        $projectIndicatorsWithDessaggregations = $this->projectIndicatorsWithDessaggregations($project, $databaseId);
-
-        $projectOutputs = $this->projectOutputsToASpicificDatabase($project, $databaseId);
-
-        $projectOutcomes = $this->projectOutcomesToASpicificDatabase($project, $databaseId);
-
         $updatedIndicators = collect();
 
 
         if ($database->name == "cd_database") 
         {
 
-            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $databaseId) {
+            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $databaseId, $provinceId) {
                 $query->whereIn('programs.id', $projectPrograms)
-                      ->where('database_program_beneficiary.database_id', $databaseId);
+                      ->where('database_program_beneficiary.database_id', $databaseId)
+                      ->where("province_id", $provinceId);
             })
+            ->where("dateOfRegistration", ">=", $from)
+            ->where("dateOfRegistration", "<=", $to)
             ->with(['indicators', 'programs'])
             ->get();
         
@@ -98,7 +105,10 @@ class AprGeneratorController extends Controller
                     //     $updatedIndicators->push($subIndicator);
                     // }
         
-                } elseif ($indicator->dessaggregationType === 'session') {
+                }
+                
+                
+                elseif ($indicator->dessaggregationType === 'session') {
                     $achieved = $beneficiaries->reduce(function ($total, $b) use ($indicator) {
                         if ($b->indicators->contains('id', $indicator->id)) {
                             $total += $b->communityDialogueSessions->count();
@@ -142,22 +152,23 @@ class AprGeneratorController extends Controller
         
         elseif ($database->name == "main_database_meal_tool") {
 
-            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms) {
+            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $provinceId) {
                 $query->whereIn('programs.id', $projectPrograms)
-                    ->where('database_program_beneficiary.database_id', 1);
+                    ->where('database_program_beneficiary.database_id', 1)
+                    ->where('province_id', $provinceId);
             })
             ->whereHas('mealTools')
-            ->with(['mealTools', 'indicators'])
+            ->where("dateOfRegistration", ">=", $from)
+            ->where("dateOfRegistration", "<=", $to)
             ->get();
 
         
             foreach ($projectIndicators as $indicator) {
-                $achieved = $beneficiaries->filter(fn($b) => $b->indicators->contains('id', $indicator->id))->count();
+                $achieved = $beneficiaries->count();
         
                 $indicator->achived_target = $achieved;
                 $indicator->save();
 
-                // NEW: dessaggregation update using beneficiaries (meal tool context)
                 $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
 
                 $updatedIndicators->push($indicator);
@@ -166,7 +177,12 @@ class AprGeneratorController extends Controller
         
         elseif ($database->name == "psychoeducation_database") {
 
-            $psychoeducations = Psychoeducations::whereHas("program", fn($q) => $q->whereIn("program_id", $projectPrograms))->get();
+            $psychoeducations = Psychoeducations::whereHas("program", function ($q) use ($provinceId, $projectPrograms) { 
+                $q->whereIn("program_id", $projectPrograms)->where("province_id", $provinceId);
+            })
+            ->where("awarenessDate", ">=", $from)
+            ->where("awarenessDate", "<=", $to)
+            ->get();
 
             foreach ($projectIndicators as $indicator) {
                 $achieved = $psychoeducations->where('indicator_id', $indicator->id)->count();
@@ -183,7 +199,11 @@ class AprGeneratorController extends Controller
 
             $trainings = Training::where('project_id', $projectId)
                 ->where('province_id', $provinceId)
-                ->with('beneficiaries')
+                ->with('beneficiaries', function ($q) use ($from, $to) {
+                    $q
+                    ->where("dateOfRegistration", ">=", $from)
+                    ->where("dateOfRegistration", "<=", $to);
+                })
                 ->get();
         
             foreach ($projectIndicators as $indicator) {
@@ -203,11 +223,60 @@ class AprGeneratorController extends Controller
             }
         }
 
+        elseif ($database->name == "refferal_database") {
+
+            $beneficiaries = 
+            Beneficiary::whereHas("referral", function ($q) use ($projectId, $provinceId) {
+                $q->whereHas("indicator", function ($q2) use ($projectId, $provinceId) {
+                    $q2->whereHas("output", function ($q3) use ($projectId) {
+
+                        $q3->whereHas("outcome", function ($q4) use ($projectId) {
+                            $q4->whereHas("project", function ($q5) use ($projectId) {
+                                $q5->where("id", $projectId);
+                            });
+                        });
+
+                    });
+
+                    $q2->whereHas("provinces", function ($q3) use ($provinceId) {
+
+                        $q3->where("province_id", $provinceId);
+                        
+                    });
+                });
+            })
+            ->where("dateOfRegistration", ">=", $from)
+            ->where("dateOfRegistration", "<=", $to)
+            ->with(["referral"])
+            ->get();;
+
+
+            foreach ($projectIndicators as $indicator) {
+
+                $achieved = $beneficiaries->reduce(function ($carry, $beneficiary) use ($indicator) {
+                    if ($beneficiary->referral->indicator_id == $indicator->id) {
+                        return $carry + 1;
+                    }
+                    return $carry;
+                }, 0);
+
+                $indicator->achived_target = $achieved;
+                $indicator->save();
+                $updatedIndicators->push($indicator);
+
+                $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+
+            }
+
+        }
+
         elseif  ($database->name == "enact_database") {
 
 
             $enacts = Enact::where('project_id', $projectId)
                 ->where('province_id', $provinceId)
+                ->where("date", ">=", $from)
+                ->where("date", "<=", $to)
                 ->with('assessments')
                 ->get();
 
@@ -278,12 +347,16 @@ class AprGeneratorController extends Controller
 
         }
         
+        // Handles Main databas & Kit database.
         else {
 
-            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $databaseId) {
+            $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $databaseId, $provinceId) {
                 $query->whereIn('programs.id', $projectPrograms)
-                    ->where('database_program_beneficiary.database_id', $databaseId);
+                    ->where('database_program_beneficiary.database_id', $databaseId)
+                    ->where("province_id", $provinceId);
             })
+            ->where("dateOfRegistration", ">=", $from)
+            ->where("dateOfRegistration", "<=", $to)
             ->with(['indicators.sessions', 'programs'])
             ->get();
 
@@ -323,15 +396,16 @@ class AprGeneratorController extends Controller
                 
                             return $total;
                         }, 0);
-                
+
+                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId);
+
                         $subIndicator->update(['achived_target' => $subAchieved]);
                     }
-                
-                    // else {
-                    //     \Illuminate\Support\Facades\Log::warning("No sub-indicator found for indicator ID: {$indicator->id}");
-                    // }
+
                 }
-                 elseif ($indicator->dessaggregationType === 'session') {
+
+
+                elseif ($indicator->dessaggregationType === 'session') {
 
                     $subIndicator = Indicator::where('parent_indicator', $indicator->id)->first();
 
@@ -342,15 +416,16 @@ class AprGeneratorController extends Controller
                             $total += $ind->sessions->count();
 
                             // $groupDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)
-                                                                            // ->where("description", "# 0f group MHPSS consultations")->first();
+                            //                                                 ->where("description", "# 0f group MHPSS consultations")->first();
                             // $individualDessaggregation = Dessaggregation::where("indicator_id", $indicator->id)->where("description", "# 0f indevidual MHPSS consultations")->first();
 
-                            $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
-
+                            
                         };
                         return $total;
                     }, 0);
-
+                    
+                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                    
                     if ($subIndicator) {
                         $beneficiaryCount = $beneficiaries->filter(fn($b) => $b->indicators->contains('id', $indicator->id))->count();
                         $subIndicator->update(['achived_target' => $beneficiaryCount]);
@@ -368,95 +443,18 @@ class AprGeneratorController extends Controller
             }
         }
 
-        $isp3s = $projectIndicatorsWithDessaggregations->flatMap(function ($indicator) {
-            return $indicator->isp3()->with("indicators")->get();
-        });
-
-        $isp3s->map(function ($isp3) {
-            $isp3["isp3"] = $isp3->description;
-
-            unset(
-                $isp3["description"],
-                $isp3["id"],
-                $isp3["pivot"],
-            );
-
-            $isp3->indicators->map(function ($indicator) {
-                unset(
-                    $indicator["created_at"],
-                    $indicator["updated_at"],
-                    $indicator["database_id"],
-                    $indicator["description"],
-                    $indicator["dessaggregationType"],
-                    $indicator["id"],
-                    $indicator["status"],
-                    $indicator["target"],
-                    $indicator["achived_target"],
-                    $indicator["output_id"],
-                    $indicator["pivot"],
-                    $indicator["type_id"],
-                    $indicator["parent_indicator"],
-                );
-
-                $indicator->dessaggregations->map(function ($dessaggregation) {
-
-                    $dessaggregation["name"] = $dessaggregation["description"];
-
-                    unset(
-                        $dessaggregation["achived_target"],
-                        $dessaggregation["created_at"],
-                        $dessaggregation["updated_at"],
-                        $dessaggregation["description"],
-                        $dessaggregation["id"],
-                        $dessaggregation["indicator_id"],
-                        $dessaggregation["province_id"],
-                        $dessaggregation["province_id"],
-                    );
-
-                    return $dessaggregation;
-                });
-
-            
-                return $indicator;
-            });
-        });
-
-        $finalAPR = [
-            "impact" => $project->projectGoal,
-            "outcomes" => $project->outcomes->map(function ($outcome) use ($updatedIndicators) {
-                return [
-                    "name" => $outcome->outcome,
-                    "outputs" => $outcome->outputs->map(function ($output) use ($updatedIndicators) {
-                        return [
-                            "name" => $output->output,
-                            "indicators" => $output->indicators->map(function ($indicator) {
-                                return [
-                                    "code" => $indicator->indicatorRef,
-                                    "name" => $indicator->indicator,
-                                    "isSub" => false,
-                                    "disaggregation" => $indicator->dessaggregations->map(function ($d) {
-                                        return [
-                                            "name" => $d->description,
-                                            "target" => $d->target ?? 0,
-                                            "months" => $d->months ?? array_fill(0, 12, 0)
-                                        ];
-                                    })->toArray(),
-                                ];
-                            })->toArray(),
-                        ];
-                    })->toArray(),
-                ];
-            })->toArray(),
-            "isp3s" => $isp3s
-        ];
-        
-        return response()->json([
-            "status" => true,
-            "message" => "Indicators updated successfully.",
-            "data" => $finalAPR,
-        ], 200);
     }
 
+    /**
+     * Main method to show a spicific database apr.
+     *
+     * @param string $projectId
+     * @param string $databaseId
+     * @param string $provinceId
+     * @param string $fromDate
+     * @param string $toDate
+     * @return void
+     */
     public function showSpicificDatabaseApr(string $projectId, string $databaseId, string $provinceId, string $fromDate, string $toDate)
     {
         $project = Project::with("outcomes.outputs.indicators.dessaggregations")->find($projectId);
@@ -468,7 +466,33 @@ class AprGeneratorController extends Controller
         $province = Province::find($provinceId);
         if (!$province) return response()->json(["status" => false, "message" => "No such province in system!"], 404);
 
-        $projectIndicators = $this->projectIndicatorsToASpicificDatabase($project, $databaseId);
+        $projectIndicators = $this->projectIndicatorsToASpicificDatabase($project, "*");
+
+        $projectIndicatorsWithDessaggregations = $this->projectIndicatorsWithDessaggregations($project, $databaseId);
+        
+
+        $isp3s = $projectIndicatorsWithDessaggregations->flatMap(function ($indicator) {
+            return $indicator->isp3()->with("indicators")->get();
+        });
+
+        $isp3s = $isp3s->map(function ($isp3) {
+            return [
+                "isp3" => $isp3->description,
+                "indicators" => $isp3->indicators->map(function ($indicator) {
+                    return [
+                        "indicatorRef" => $indicator->indicatorRef,
+                        "indicator" => $indicator->indicator,
+                        "disaggregation" => $indicator->dessaggregations->map(function ($d) {
+                            return [
+                                "name" => $d->description,
+                                "target" => $d->target ?? 0,
+                                "months" => $d->months ?? array_fill(0, 12, 0)
+                            ];
+                        })->toArray(),
+                    ];
+                })->toArray(),
+            ];
+        });
 
         $finalAPR = [
             "impact" => $project->projectGoal,
@@ -507,6 +531,7 @@ class AprGeneratorController extends Controller
                     })->values()->toArray(),
                 ];
             })->filter()->values()->toArray(),
+            "isp3s" => $isp3s
         ];
 
         return response()->json([
@@ -518,11 +543,14 @@ class AprGeneratorController extends Controller
     /**
      * Update dessaggregation targets based on beneficiaries collection.
      * This covers demographic dessaggregations and session/group splits.
+     * 
+     * @helperMethod
      */
     private function updateDessaggregationsFromBeneficiaries(Indicator $indicator, Collection $beneficiaries, Int $provinceId)
     {
 
         $dess = $indicator->dessaggregations()->where('province_id', $provinceId)->get();
+
         if ($dess->isEmpty()) return;
 
         $groupTotal = 0;
@@ -549,23 +577,29 @@ class AprGeneratorController extends Controller
         $individualMonthDate = array_fill(0, 12, 0);
 
         foreach ($beneficiaries as $b) {
-            if (!$b->indicators->contains('id', $indicator->id)) continue;
+            if ($indicator->database->name != "refferal_database" && $indicator->database->name != "main_database_meal_tool" && (!$b->indicators->contains('id', $indicator->id))) continue;
+            else if ($indicator->database->name == "refferal_database" && $b->referral->indicator_id != $indicator->id) continue;
 
-            $ind = $b->indicators->firstWhere('id', $indicator->id);
-            if ($ind) {
-                $groupTotal += $ind->sessions->whereNotNull('group')->count();
-                $individualTotal += $ind->sessions->whereNull('group')->count();
+            $ind = $indicator;
 
-                $sessions = $ind->sessions;
-                foreach ($sessions as $s) {
-                    if (!$s->date) continue;
-                    $monthIndex = (int) Carbon::parse($s->date)->format("n") - 1;
+            $sessions = $ind->parent_indicator ? $b->sessions->where("indicator_id", $ind->parent_indicator) : $b->sessions->where("indicator_id", $ind->id);
 
-                    if ($s->group !== null) {
-                        $groupMonthDate[$monthIndex]++;
-                    } else {
-                        $individualMonthDate[$monthIndex]++;
-                    }
+            $groupTotal += $sessions->whereNotNull('group')->count();
+            $individualTotal += $sessions->whereNull('group')->count();
+
+            foreach ($sessions as $s) {
+                if (!$s->date) continue;
+                $monthIndex = (int) Carbon::parse($s->date)->format("n") - 1;
+
+                if ($s->group !== null) {
+
+                    $groupMonthDate[$monthIndex]++;
+
+                } 
+                else {
+
+                    $individualMonthDate[$monthIndex]++;
+
                 }
             }
 
@@ -631,6 +665,8 @@ class AprGeneratorController extends Controller
      * Update dessaggregation targets from psychoeducations collection.
      * For simple case: count psychoeducations per dessaggregation description if possible,
      * otherwise set dess->achived_target to total psycho count for indicator.
+     * 
+     * @helperMethod
      */
     private function updateDessaggregationsFromPsycho(Indicator $indicator, $psychoeducations, $provinceId)
     {
@@ -708,6 +744,8 @@ class AprGeneratorController extends Controller
     /**
      * Update dessaggregation targets using trainings collection.
      * We count beneficiaries inside trainings for the indicator.
+     * 
+     * @helperMethod
      */
     private function updateDessaggregationsFromTrainings(Indicator $indicator, $trainings, $provinceId)
     {
@@ -728,34 +766,72 @@ class AprGeneratorController extends Controller
             "of Female CU5 (girls)" => 0,
         ];
 
+        $demographicMonthDate = [];
+        foreach ($demographicTargets as $key => $val) {
+            $demographicMonthDate[$key] = array_fill(0, 12, 0);
+        }
+
         foreach ($trainings as $training) {
             if ($training->indicator_id != $indicator->id) continue;
 
             foreach ($training->beneficiaries as $b) {
 
-                if ($b->gender == "male" && $b->age >= 18)
+                try {
+                    $dateOfRegistration = $b->dateOfRegistration ? Carbon::parse($b->dateOfRegistration) : null;
+                    $monthIndex = $dateOfRegistration ? ((int) $dateOfRegistration->format("n") - 1) : null;
+                } catch (\Exception $e) {
+                    $monthIndex = null;
+                }
+
+
+                if ($b->gender == "male" && $b->age >= 18) 
+                {
                     $demographicTargets["Of Male (above 18)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["Of Male (above 18)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "female" && $b->age >= 18)
+                {
                     $demographicTargets["Of Female (above 18)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["Of Female (above 18)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "male" && ($b->age >= 12 && $b->age <= 17))
+                {
                     $demographicTargets["of Male adolescents (12 to 17 years old)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Male adolescents (12 to 17 years old)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "female" && ($b->age >= 12 && $b->age <= 17))
+                {
                     $demographicTargets["of Female adolescents (12 to 17 years old)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Female adolescents (12 to 17 years old)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "male" && ($b->age >= 6 && $b->age <= 11))
+                {
                     $demographicTargets["of Male children (6 to 11 years old)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Male children (6 to 11 years old)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "female" && ($b->age >= 6 && $b->age <= 11))
+                {
                     $demographicTargets["of Female children (6 to 11 years old)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Female children (6 to 11 years old)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "male" && ($b->age >= 1 && $b->age <= 5))
+                {
                     $demographicTargets["of Male CU5 (boys)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Male CU5 (boys)"][$monthIndex]++;
+                }
 
                 else if ($b->gender == "female" && ($b->age >= 1 && $b->age <= 5))
+                {
                     $demographicTargets["of Female CU5 (girls)"]++;
+                    if ($monthIndex !== null) $demographicMonthDate["of Female CU5 (girls)"][$monthIndex]++;
+                }
+
             }
         }
 
@@ -763,11 +839,11 @@ class AprGeneratorController extends Controller
             $targetDess = $dess->firstWhere('description', $desc);
             if ($targetDess) {
                 $targetDess->achived_target = $value;
+                $targetDess->months = $demographicMonthDate[$desc];
                 $targetDess->save();
             }
         }
     }
-
 }
 
 

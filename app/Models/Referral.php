@@ -11,6 +11,7 @@ class Referral extends BaseModel
 
     protected $fillable = [
         'beneficiary_id',
+        'indicator_id',
         'referralConcern',
         'referralConcernNote',
         'concentGiven',
@@ -51,11 +52,13 @@ class Referral extends BaseModel
         'serviceRequested'  => 'array',
     ];
 
-    /**
-     * هر Referral به یک Beneficiary تعلق دارد
-     */
     public function beneficiary()
     {
         return $this->belongsTo(Beneficiary::class);
+    }
+
+    public function indicator ()
+    {
+        return $this->belongsTo(Indicator::class);
     }
 }

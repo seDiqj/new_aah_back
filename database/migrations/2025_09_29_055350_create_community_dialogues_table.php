@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId("program_id")->constrained("programs")->onDelete("cascade");
             $table->foreignId("indicator_id")->constrained("indicators")->cascadeOnDelete();
+            $table->string("name")->unique();
             $table->string("remark");
             $table->timestamps();
             $table->softDeletes();

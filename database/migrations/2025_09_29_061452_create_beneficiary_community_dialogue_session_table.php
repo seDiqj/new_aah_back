@@ -17,7 +17,7 @@ return new class extends Migration
             ->constrained('community_dialogue_sessions', 'id', 'bcds_cd_session_fk')
             ->onDelete('cascade');
             $table->foreignId("beneficiary_id")->constrained("beneficiaries")->onDelete("cascade");
-            $table->boolean("isPresent");
+            $table->boolean("isPresent")->default(true);
             $table->timestamps();
         });
     }

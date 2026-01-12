@@ -2,10 +2,14 @@
 
 namespace App\Models;
 use App\Models\BaseModel;
-
+use Dyrynda\Database\Support\CascadeSoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Apr extends BaseModel
 {    
+
+    use SoftDeletes, CascadeSoftDeletes;
+
     protected $fillable = [
         "project_id",
         "database_id",
@@ -13,6 +17,11 @@ class Apr extends BaseModel
         "status",
         "fromDate",
         "toDate"
+    ];
+
+    protected $cascadeDeletes = [
+        'logs',
+        "notifications"
     ];
 
 
@@ -34,6 +43,16 @@ class Apr extends BaseModel
 
     public function province ()
     {
-        $this->belongsTo(Province::class);
+        return $this->belongsTo(Province::class);
+    }
+
+    public function logs ()
+    {
+        return $this->hasMany(AprLog::class);
+    }
+
+    public function notifications ()
+    {
+        return $this->hasMany(Notification::class);
     }
 }

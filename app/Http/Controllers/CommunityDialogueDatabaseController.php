@@ -16,10 +16,12 @@ use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Jobs\AttachBeneficiariesToSession;
+use Illuminate\Support\Facades\Auth;
 
 class CommunityDialogueDatabaseController extends Controller
 {
-    public function indexBeneficiaries ()
+    public function indexBeneficiaries (Request $request)
     {
 
         $communityDialogueDb = Database::where("name", "cd_database")->first();
@@ -28,49 +30,145 @@ class CommunityDialogueDatabaseController extends Controller
 
         $communityDialogueDbId = $communityDialogueDb->id;
 
-        $beneficiariesIds = DatabaseProgramBeneficiary::where("database_id", $communityDialogueDbId)->pluck("beneficiary_id")->toArray();
+        $CommunityDialogueBeneficiaries = DatabaseProgramBeneficiary::where("database_id", $communityDialogueDbId)->pluck("beneficiary_id")->toArray();
 
-        $beneficiaries = Beneficiary::whereIn("id", $beneficiariesIds)->get();
+        $query = Beneficiary::query()
+            ->with(['programs.project', 'indicators']);
 
-        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary fount for community dialogue database !"], 404);
+        $query->whereIn("id", $CommunityDialogueBeneficiaries);
+
+        if ($request->filled('projectCode') || $request->filled('focalPoint') || $request->filled('province')) {
+
+            $query->whereHas('programs', function($q) use ($request, $communityDialogueDbId) {
+            if ($request->filled('projectCode')) {
+                $q->whereHas('project', function($q2) use ($request) {
+                    $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                });
+            }
+
+            if ($request->filled('focalPoint')) {
+                $q->where('focalPoint', $request->focalPoint);
+            }
+
+            if ($request->filled('province')) {
+                $q->whereHas("province", function ($q2) use ($request) {
+                    $q2->where("name", $request->province);
+                });
+            }
+
+        });
+
+        }
+
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', $request->dateOfRegistration);
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', $request->age);
+        }
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicators', function($q) use ($request) {
+                $q->where('indicatorRef', 'like', '%' . $request->indicator . '%');
+            });
+        }
+
+        if ($search = $request->input("search")) {
+            $query->where("name", "like", "%$search%");
+        }
+
+        if ($request->filled('code')) {
+            $query->where("code", "like", "%" . $request->code . "%");
+        }
+
+        $beneficiaries = $query->paginate(10);
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiary was found !", "data" => []], 200);
+
+        $beneficiaries->getCollection()->transform(function ($bnf) {
+            $bnf->programName = optional($bnf->programs->first())->name;
+            unset($bnf->programs);
+            return $bnf;
+        });
 
         return response()->json(["status" => true, "message" => "" , "data" => $beneficiaries]);
     }
 
-    public function indexCommunityDialogues ()
+    public function indexCommunityDialogues(Request $request)
     {
-        $communityDialogues = CommunityDialogue::with('program')->get();
+        $query = CommunityDialogue::query()
+            ->with([
+                'program.project',
+                'program.province',
+                'program.district',
+                'indicator',
+                'sessions',
+                'groups'
+            ]);
 
-        if ($communityDialogues->isEmpty()) return response()->json(["status" => false, "message" => "No community dialogue was found !"], 404);
-
-        $communityDialogues = $communityDialogues->map(function ($cd) {
-            $cd->projectCode = Project::find($cd->program->project_id)->projectCode;
-            $cd->province = Province::find($cd->program->province_id)->name;
-            $cd->district = District::find($cd->program->district_id)->name;
-            $cd->indicator = Indicator::find($cd->indicator_id)->indicatorRef;
-            $cd->village = $cd->program->village;
-            $cd->focalPoint = $cd->program->focalPoint;
-            $cd->numOfSessions = $cd->sessions->count();
-            $cd->numOfGroups = $cd->groups->count();
-
-            unset(
-                $cd['program'],
-                $cd['indicator_id'],
-                $cd['sessions'],
-                $cd['groups'],
-                $cd['program_id'],
+        if ($request->filled('projectCode')) {
+            $query->whereHas('program.project', fn ($q) =>
+                $q->where('projectCode', 'like', '%' . $request->projectCode . '%')
             );
+        }
 
-            return $cd;
+        if ($request->filled('focalPoint')) {
+            $query->whereHas('program', fn ($q) =>
+                $q->where('focalPoint', 'like', '%' . $request->focalPoint . '%')
+            );
+        }
+
+        if ($request->filled('province')) {
+            $query->whereHas('program.province', fn ($q) =>
+                $q->where('name', $request->province)
+            );
+        }
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicator', fn ($q) =>
+                $q->where('indicatorRef', 'like', '%' . $request->indicator . '%')
+            );
+        }
+
+        if ($search = $request->input("search")) {
+            $query->where("name", "like", "%" . $search . "%");
+        }
+
+        $cds = $query->paginate(10);
+
+        if ($cds->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No community dialogue was found!",
+                "data" => []
+            ], 200);
+        }
+
+        $cds->getCollection()->transform(function ($cd) {
+            return [
+                'id' => $cd->id,
+                'projectCode' => $cd->program?->project?->projectCode,
+                'province' => $cd->program?->province?->name,
+                'district' => $cd->program?->district?->name,
+                'indicator' => $cd->indicator?->indicatorRef,
+                'village' => $cd->program?->village,
+                'focalPoint' => $cd->program?->focalPoint,
+                'numOfSessions' => $cd->sessions->count(),
+                'numOfGroups' => $cd->groups->count(),
+            ];
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $communityDialogues]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $cds
+        ]);
     }
 
     public function indexCommunityDialoguesForSelection()
     {
-        $communityDialogues = CommunityDialogue::with("program", "groups")
-            ->get(["id", "program_id"]);
+        $communityDialogues = CommunityDialogue::with("groups")->select(["id", "name"])->get(["id", "program_id"]);
 
         if ($communityDialogues->isEmpty()) {
             return response()->json([
@@ -79,21 +177,21 @@ class CommunityDialogueDatabaseController extends Controller
             ], 404);
         }
 
-        $communityDialogues->map(function ($communityDialogue) {
+        // $communityDialogues->map(function ($communityDialogue) {
 
-            $communityDialogue->program->database = Database::find($communityDialogue->program->database_id)->name;
+        //     $communityDialogue->program->database = Database::find($communityDialogue->program->database_id)->name;
 
-            $communityDialogue->program->projectCode = Project::find($communityDialogue->program->project_id)->projectCode;
+        //     $communityDialogue->program->projectCode = Project::find($communityDialogue->program->project_id)->projectCode;
 
-            $communityDialogue->program->district = District::find($communityDialogue->program->district_id)->name;
+        //     $communityDialogue->program->district = District::find($communityDialogue->program->district_id)->name;
 
-            $communityDialogue->program->province = Province::find($communityDialogue->program->province_id)->name;
+        //     $communityDialogue->program->province = Province::find($communityDialogue->program->province_id)->name;
 
-            unset($communityDialogue["created_at"], $communityDialogue["updated_at"]);
-            unset($communityDialogue->program["created_at"], $communityDialogue->program["updated_at"], $communityDialogue->program["project_id"], $communityDialogue->program["database_id"], $communityDialogue->program["province_id"], $communityDialogue->program["district_id"]);
+        //     unset($communityDialogue["created_at"], $communityDialogue["updated_at"]);
+        //     unset($communityDialogue->program["created_at"], $communityDialogue->program["updated_at"], $communityDialogue->program["project_id"], $communityDialogue->program["database_id"], $communityDialogue->program["province_id"], $communityDialogue->program["district_id"]);
 
-            return $communityDialogue;
-        });
+        //     return $communityDialogue;
+        // });
 
         return response()->json([
             "status" => true,
@@ -102,36 +200,87 @@ class CommunityDialogueDatabaseController extends Controller
         ]);
     }
 
-    public function indexBeneficirySessions (string $id)
+    public function indexBeneficirySessions(Request $request, string $id)
     {
         $beneficiary = Beneficiary::find($id);
 
-        if (!$beneficiary) return response()->json(["status", false, "message" => "No such beneficiary in system !"], 404);
+        if (!$beneficiary) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such beneficiary in system !",
+                "data" => []
+            ], 404);
+        }
 
-        $sessions = $beneficiary->cdSessions;
+        $query = $beneficiary->cdSessions();
 
-        if ($sessions->isEmpty()) return response()->json(["status" => false, "message" => "No session was found for current beneficiary !"], 404);
+        if ($request->filled("type")) {
+            $query->where("type", "like", "%$request->type%");
+        }
 
-        $sessions = $sessions->map(function ($session) {
-            $session["isPresent"] = (bool) $session->pivot->isPresent;
+        if ($request->filled("date")) {
+            $query->whereDate("date", "like", "%$request->date%");
+        }
 
-            unset($session["pivot"], $session["community_dialogue_id"]);
+        if ($search = request("search")) {
+            $query->where("topic", "like", "%{$search}%");
+        }
+
+        $sessions = $query->paginate(10);
+
+        if ($sessions->isEmpty()) {
+            return response()->json([
+                "status" => false,
+                "message" => "No session was found for current beneficiary !",
+                "data" => []
+            ], 200);
+        }
+
+        $sessions->getCollection()->transform(function ($session) {
+            $session->isPresent = (bool) $session->pivot->isPresent;
+
+            unset($session->pivot, $session->community_dialogue_id);
 
             return $session;
         });
 
-        return response()->json(["status" => true, "message" => "", "data" => $sessions]);
+        return response()->json([
+            "status" => true,
+            "message" => "",
+            "data" => $sessions
+        ], 200);
     }
 
-    public function indexCdSessions (string $id)
+    public function indexCdSessions (Request $request, string $id)
     {
         $communityDialogue = CommunityDialogue::find($id);
 
         if (!$communityDialogue) return response()->json(["status" => false, "message" => "No such community dialogue in system !"], 404);
 
-        $sessions = $communityDialogue->sessions;
+        $query = $communityDialogue->sessions();
 
-        if ($sessions->isEmpty()) return response()->json(["status" => false, "message" => "No sessions was found for current community dialogue !"], 404);
+
+        if ($request->filled("type")) {
+
+            $query->where("type", "like", "%" . $request->type . "%");
+
+        }
+
+        if ($request->filled("date")) {
+
+            $query->where("date", "like", "%" . $request->date . "%");
+
+        }
+
+        if ($search = request("search")) {
+
+            $query->where("topic", "like", "%" . $search . "%");
+
+        }
+
+        $sessions = $query->paginate(10);
+
+        if ($sessions->isEmpty()) return response()->json(["status" => false, "message" => "No sessions was found for current community dialogue !", "data" => []], 200);
 
         $sessions->map(function ($session) {
             unset($session["community_dialogue_id"]);
@@ -142,26 +291,70 @@ class CommunityDialogueDatabaseController extends Controller
         return response()->json(["status" => true, "message" => "" , "data" => $sessions]);
     }
 
-    public function indexCommunityDialogueGroupBeneficiaries (string $id)
+    public function indexCommunityDialogueGroupBeneficiaries (Request $request, string $id)
     {
+
         $group = Group::find($id);
 
         if (!$group) return response()->json(["status" => false, "message" => "No such group in system !"], 404);
 
-        $beneficiaries = $group->beneficiaries;
+        $query = $group->beneficiaries()->with(['programs.project', 'indicators']);
 
-        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiaries was found for current group !"], 404);
+
+        if ($request->filled('projectCode') || $request->filled('focalPoint') || $request->filled('province')) {
+
+                $query->whereHas('programs', function($q) use ($request) {
+                if ($request->filled('projectCode')) {
+                    $q->whereHas('project', function($q2) use ($request) {
+                        $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
+                    });
+                }
+
+                if ($request->filled('focalPoint')) {
+                    $q->where('focalPoint', $request->focalPoint);
+                }
+
+                if ($request->filled('province')) {
+                    $q->whereHas("province", function ($q2) use ($request) {
+                        $q2->where("name", $request->province);
+                    });
+                }
+
+            });
+
+        }
+
+        if ($request->filled('dateOfRegistration')) {
+            $query->where('dateOfRegistration', $request->dateOfRegistration);
+        }
+
+        if ($request->filled('age')) {
+            $query->where('age', $request->age);
+        }
+
+        if ($request->filled('indicator')) {
+            $query->whereHas('indicators', function($q) use ($request) {
+                $q->where('indicatorRef', 'like', '%' . $request->indicator . '%');
+            });
+        }
+
+        if ($search = $request->input("search")) {
+            $query->where("name", "like", "%$search%");
+        }
+
+
+        $beneficiaries = $query->paginate(10);
+
+        if ($beneficiaries->isEmpty()) return response()->json(["status" => false, "message" => "No beneficiaries was found for current group !", "data" => []], 200);
 
         return response()->json(["status" => true, "message" => "", "data" => $beneficiaries]);
     }
 
     public function showBeneficiary (string $id)
     {
-        $beneficiary = Beneficiary::select("id", "name", "fatherHusbandName", "gender", "age", "incentiveReceived", "incentiveAmount", "jobTitle", "nationalId", "phone", "maritalStatus")->find($id);
+        $beneficiary = Beneficiary::select("id", "name", "fatherHusbandName", "gender", "age", "incentiveReceived", "incentiveAmount", "jobTitle", "nationalId", "phone", "maritalStatus", "dateOfRegistration")->find($id);
 
         if (!$beneficiary) return response()->json(["status" => false, "message" => "No such Beneficiary in system !"], 404);
-
-        $beneficiary->incentiveReceived = (bool) $beneficiary->incentiveReceived;
 
         return response()->json(["status" => true, "message" => "", "data" => $beneficiary]);
     }
@@ -180,11 +373,12 @@ class CommunityDialogueDatabaseController extends Controller
 
         $communityDialogue["program"]["province"] = Province::find($communityDialogue["program"]["province_id"])->name;
 
+
         unset(
-            $communityDialogue["program"]["program_id"], 
-            $communityDialogue["program"]["project_id"], 
-            $communityDialogue["program"]["database_id"], 
-            $communityDialogue["program"]["province_id"], 
+            $communityDialogue["program"]["program_id"],
+            $communityDialogue["program"]["project_id"],
+            $communityDialogue["program"]["database_id"],
+            $communityDialogue["program"]["province_id"],
             $communityDialogue["program"]["district_id"],
             $communityDialogue["program"]["created_at"],
             $communityDialogue["program"]["updated_at"],
@@ -211,6 +405,7 @@ class CommunityDialogueDatabaseController extends Controller
         }
 
         $communityDialogue->program->indicator_id = $communityDialogue->indicator_id;
+        $communityDialogue->program->cdName = $communityDialogue->name;
 
         $programInformation = [];
 
@@ -254,12 +449,15 @@ class CommunityDialogueDatabaseController extends Controller
 
     public function storeCommunityDialogue (Request $request)
     {
-
         $communityDialogueDatabase = Database::where("name", "cd_database")->first();
 
         if (!$communityDialogueDatabase) return response()->json(["status" => false, "message" => "Community dialogue is not a valid database !"], 422);
 
         $programInformation = $request->input("programInformation");
+
+        $exists = CommunityDialogue::where("name", $programInformation["cdName"])->exists();
+
+        if ($exists) return response()->json(["status" => false, "message" => "Entered community dialogue name has already been used !", "data" => []], 422);
 
         $communityDialogueIndicator = Indicator::find($programInformation["indicator_id"]);
 
@@ -272,11 +470,16 @@ class CommunityDialogueDatabaseController extends Controller
         // temprory
         $programInformation["database_id"] = $communityDialogueDatabase->id;
 
+        $cdName = $programInformation["cdName"];
+
+        unset($programInformation["cdName"]);
+
         $program = Program::create($programInformation);
 
         $communityDialogue = CommunityDialogue::create([
             "program_id" => $program->id,
             "indicator_id" => $communityDialogueIndicator->id,
+            "name" => $cdName,
             "remark" => $request->remark ?? ""
         ]);
 
@@ -297,6 +500,25 @@ class CommunityDialogueDatabaseController extends Controller
         }
 
         return response()->json(["status" => true, "message" => "Community dialogue successfully created !"], 200);
+
+    }
+
+    public function createNewGroup (Request $request, string $id)
+    {
+
+        $communityDialogue = CommunityDialogue::find($id);
+
+        if (!$communityDialogue) return response()->json(["status" => false, "message" => "No such community dialogue in system !", "data" => []], 404);
+
+        $validated = $request->validate(
+            [
+                "name" => "required|string|min:3"
+            ]
+        );
+
+        $communityDialogue->groups()->create($validated);
+
+        return response()->json(["status" => true, "message" => "Group successfully created !", "data" => []], 200);
 
     }
 
@@ -359,18 +581,12 @@ class CommunityDialogueDatabaseController extends Controller
             array_push($newSessions, $createdSession);
         }
 
-        // $communityDialogueBeneficiaries = $communityDialogue->beneficiaries;
+        $communityDialogueBeneficiaries = $communityDialogue->beneficiaries()->get();
+        $communityDialogueSessionsIds = $communityDialogue->sessions()->pluck("id");
 
-
-        // foreach ($communityDialogueBeneficiaries as $bnf) {
-        //     foreach ($newSessions as $session) {
-        //             $bnf->communityDialogueSessions()->create([
-        //             'community_dialogue_session_id' => $session->id,
-        //             'beneficiary_id' => $bnf->id,
-        //             'isPresent' => true
-        //         ]);
-        //     }
-        // }
+        foreach ($communityDialogueBeneficiaries as $bnf) {
+            $bnf->communityDialogueSessions()->sync($communityDialogueSessionsIds);
+        }
 
         $groups = $request->input("groups", []);
         foreach ($groups as $group) {
@@ -406,12 +622,13 @@ class CommunityDialogueDatabaseController extends Controller
 
     public function destroyCommunityDialogue (Request $request)
     {
-        $ids = $request->input("ids");
-
+        
         $request->validate([
             "ids" => "required|array",
             "ids.*" => "integer"
         ]);
+        
+        $ids = $request->input("ids");
 
         CommunityDialogue::whereIn("id", $ids)->delete();
 
@@ -430,6 +647,43 @@ class CommunityDialogueDatabaseController extends Controller
         $beneficiary->cdSessions()->whereIn('community_dialogue_session_id', $ids)->forceDelete();
 
         return response()->json(["status" => true, "message" => "Sessions successfully removed !"], 200);
+
+    }
+
+    public function destroySessions(Request $request) 
+    {
+
+        $request->validate([
+            "ids" => "required|array",
+            "ids.*" => "integer"
+        ]);
+        
+        $ids = $request->input("ids");
+
+        CommunityDialogueSession::whereIn("id", $ids)->delete();
+
+        return response()->json(["status" => true, "message" => "Selected sessions successfully deleted !"], 200);
+
+    }
+
+    public function destroyGroup (string $id) 
+    {
+
+        $group = Group::find($id);
+
+        if (!$group) return response()->json(["status" => false, "message" => "No such group in system !", "data" => []], 404);
+
+        $groupBeneficiaries = $group->beneficiaries;
+
+        foreach ($groupBeneficiaries as $bnf) {
+
+            $bnf->cdSessions()->sync([]);
+
+        }
+
+        $group->forceDelete();
+
+        return response()->json(["status" => true, "message" => "Group successfully deleted !", "data" => []], 200);
 
     }
 
@@ -453,7 +707,7 @@ class CommunityDialogueDatabaseController extends Controller
         if ($beneficiaries->isEmpty()) {
             return response()->json([
                 "status" => false,
-                "message" => "No such beneficiary / beneficiaries in system!"
+                "message" => "No such beneficiaries in system!"
             ], 404);
         }
 
@@ -510,35 +764,49 @@ class CommunityDialogueDatabaseController extends Controller
 
     public function createNewSession(Request $request)
     {
+
         $validated = $request->validate([
-            "community_dialogue_id" => "required|exists:community_dialogues,id",
+            "community_dialogue_id" => "required",
             "topic" => "required|string|min:3",
             "date" => "required|date"
         ]);
 
-        $validated["type"] = "followUp";
+        $cd = CommunityDialogue::find($validated["community_dialogue_id"]);
 
-        $exists = CommunityDialogueSession::where("community_dialogue_id", $validated["community_dialogue_id"])
-            ->where("topic", $validated["topic"])
-            ->where("date", $validated["date"])
-            ->exists();
+        if (!$cd) return response()->json(["status" => false, "message" => "No such community dialogue in system !", "data" => []], 404);
 
-        if ($exists) {
-            return response()->json([
-                "status" => false,
-                "message" => "This session already exists for this community dialogue!"
-            ], 409);
-        }
 
-        CommunityDialogueSession::create($validated);
+        $numOfCdSessions = $cd->sessions()->count();
+
+        if ($numOfCdSessions >= 1) $validated["type"] = "followUp";
+        else $validated["type"] = "initial";
+
+        $createdSession = CommunityDialogueSession::create($validated);
+
+
+        $beneficiaryIds = $cd->sessions()
+                            ->with('beneficiaries')
+                            ->get()
+                            ->flatMap(fn ($s) => $s->beneficiaries)
+                            ->unique('id')
+                            ->pluck('id')
+                            ->toArray();
+
+
+        AttachBeneficiariesToSession::dispatch(
+            $createdSession->id,
+            $beneficiaryIds,
+            Auth::id()
+        );
 
         return response()->json([
-            "status" => true,
-            "message" => "New session successfully created!"
-        ], 201);
+            "status"  => true,
+            "message" => "The new session has been successfully created. The system is now attaching all participants to the session. You will be notified as soon as this process is completed."
+        ], 200);
+
     }
 
-    public function showSession($id)
+    public function showSession(string $id)
     {
         $session = CommunityDialogueSession::find($id);
 
@@ -625,4 +893,79 @@ class CommunityDialogueDatabaseController extends Controller
         return response()->json(["status" => true, "message" => "Presence status successfully changed !"], 200);
     }
 
+    public function removeBeneficiariesFromGroup(Request $request, string $id)
+    {
+        $group = Group::find($id);
+
+        if (!$group) {
+            return response()->json([
+                "status" => false,
+                "message" => "No such group in system!",
+                "data" => []
+            ], 404);
+        }
+
+        $request->validate([
+            "ids" => "required|array",
+            "ids.*" => "integer"
+        ]);
+
+        $beneficiaries = $group->beneficiaries()
+            ->whereIn("beneficiary_id", $request->ids)
+            ->get();
+
+        $cdGroupIds = $group->communityDialogue
+            ->groups()
+            ->pluck("id")
+            ->toArray();
+
+        $cdSessionIds = $group->communityDialogue
+            ->sessions()
+            ->pluck("community_dialogue_sessions.id")
+            ->toArray();
+
+        foreach ($beneficiaries as $bnf) {
+
+            $bnf->groups()->detach($group->id);
+
+            $stillInCd = $bnf->groups()
+                ->whereIn("groups.id", $cdGroupIds)
+                ->exists();
+
+            if (!$stillInCd) {
+                $bnf->cdSessions()->detach($cdSessionIds);
+            }
+        }
+
+        return response()->json([
+            "status" => true,
+            "message" => "Selected beneficiaries successfully removed!",
+            "data" => []
+        ]);
+    }
+
+    public function removeBeneficiariesFromCd (Request $request, string $id) 
+    {
+
+        $communityDialogue = CommunityDialogue::find($id);
+
+        if (!$communityDialogue) return response()->json(["status" => false, "message" => "No such community dialogue in system !"], 404);
+
+        $communityDialogue->beneficiaries()->whereIn("id", $request->input("ids"))->delete();
+
+        return response()->json(["status" => true, "message" => "Selected beneficiaries successfully removed !"], 200);
+
+    }
+
+    public function removeBeneficiaryFromCd (string $id) 
+    {
+
+        $beneficiary = Beneficiary::find($id);
+
+        if (!$beneficiary) return response()->json(["status" => false, "message" => "No such beneficiary in system !"], 404);
+
+    }
+
 }
+
+

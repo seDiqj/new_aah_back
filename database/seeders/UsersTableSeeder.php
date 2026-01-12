@@ -32,15 +32,6 @@ class UsersTableSeeder extends Seeder
             return;
         }
 
-        $permissions = Permission::pluck('name')->toArray();
-
-        if (empty($permissions)) {
-            $this->command->warn('⚠️  No permissions found. Did you run the permission seeder?');
-            return;
-        }
-
-        $user->syncPermissions($permissions);
-
         $this->command->info('✅ All permissions assigned successfully to user: ' . $user->email);
     }
 }

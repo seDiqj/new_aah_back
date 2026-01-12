@@ -20,6 +20,17 @@ class AuthenticationController extends Controller
 
         $user = Auth::user();
 
+        if ($user->status == "deactive") {
+            return response()->json(["status" => false, "message" => "Your account has been disabled for some reason."], 403);
+        } 
+
+        else if ($user->status == "blocked") {
+
+            return response()->json(["status" => false, "message" => "Your account has been blocked for some reason."], 403);
+
+        }
+        
+
         $abilities = ['*'];
         $expiration = $request->remember ? now()->addDays(30) : now()->addHours(2);
 

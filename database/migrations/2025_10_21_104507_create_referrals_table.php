@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('referrals', function (Blueprint $table) {
             $table->id();
             $table->foreignId("beneficiary_id")->constrained("beneficiaries")->onDelete("cascade");
+            $table->foreignId("indicator_id")->constrained("indicators")->onDelete("cascade");
             $table->boolean("referralConcern")->default(false);
             $table->tinyText("referralConcernNote")->nullable()->nullable();
             $table->boolean("concentGiven")->default(false);

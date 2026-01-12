@@ -3,12 +3,26 @@
 namespace App\Models;
 
 use App\Models\BaseModel;
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Database extends BaseModel
 {
 
+    use SoftDeletes, CascadeAllDeletes;
+
     protected $fillable = [
         "name"
+    ];
+
+    protected $cascadeDeletes = [
+        'indicators',
+        'programs',
+        'aprs'
+    ];
+
+    protected $cascadeRelations = [
+        'beneficiaries',
     ];
 
     protected $hidden = [
@@ -30,5 +44,10 @@ class Database extends BaseModel
     public function programs ()
     {
         return $this->hasMany(Program::class);
+    }
+
+    public function aprs () 
+    {
+        return $this->hasMany(Apr::class);
     }
 }

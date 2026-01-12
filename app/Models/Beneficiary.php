@@ -4,10 +4,15 @@ namespace App\Models;
 
 use App\Models\CommunityDialogueSession;
 use App\Models\BaseModel;
+use Dyrynda\Database\Support\CascadeSoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Beneficiary extends BaseModel
 {
-    
+
+    use SoftDeletes, CascadeSoftDeletes;
+
+
     protected $fillable = [
         "dateOfRegistration",
         "code",
@@ -32,6 +37,30 @@ class Beneficiary extends BaseModel
         "aprIncluded"
     ];
 
+    protected $cascadeDeletes = [
+        'mealTools',
+        'sessions',
+    ];
+
+    protected $cascadeHasOne = [
+        'evaluation',
+        'referral',
+    ];
+
+    protected $cascadeRelations = [
+        'kits',
+        'indicators',
+        'programs',
+        'databases',
+        'trainings',
+        'chapters',
+        'communityDialogueSessions',
+        'groups',
+    ];
+
+    protected $casts = [
+        "incentiveReceived" => "boolean"
+    ];
 
     public function kits() 
     {

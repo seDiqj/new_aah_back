@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
-use App\Models\Program;
 use App\Models\Indicator;
 use App\Models\CommunityDialogue;
 use App\Models\Province;
@@ -192,6 +191,11 @@ class FilterTablesController extends Controller
         $query = \App\Models\Program::query()
             ->with(['project']);
 
+
+        if ($search = request("search")) {
+            $query->where('name', 'like', '%' . $search . '%');
+        };
+
         $query->where('database_id', $mainDatabaseId);
 
         if ($request->filled('projectCode')) {
@@ -218,7 +222,6 @@ class FilterTablesController extends Controller
             }
         }
 
-
         if ($request->filled('village')) {
             $query->where('village', 'like', '%' . $request->village . '%');
         }
@@ -235,7 +238,6 @@ class FilterTablesController extends Controller
             $query->where('interventionModality', 'like', '%' . $request->interventionModality . '%');
         }
 
-        // اجرای query
         $programs = $query->get();
 
         if ($programs->isEmpty()) {
@@ -283,7 +285,7 @@ class FilterTablesController extends Controller
         $query = \App\Models\Program::query()
             ->with(['project']);
 
-        $query->where('database_id', $mainDatabaseId);
+        $query->where('database_id', $kitDatabaseId);
 
         if ($request->filled('projectCode')) {
             $query->whereHas('project', function($q) use ($request) {
@@ -371,27 +373,45 @@ class FilterTablesController extends Controller
             ], 404);
         }
 
-        $query = Psychoeducations::with(['program.project', 'program.province', 'program.district'])
-            ->whereHas('program', function ($q) use ($psychoeducationDatabaseID, $request) {
-                $q->where('database_id', $psychoeducationDatabaseID);
+        $query = Psychoeducations::query()
+        ->with([
+            'program' => function ($q) use ($psychoeducationDatabaseID, $request) {
+                $q->where('database_id', $psychoeducationDatabaseID)
+                ->with(['project', 'province', 'district'])
 
-                if ($request->filled('projectCode')) {
-                    $q->whereHas('project', function ($q2) use ($request) {
-                        $q2->where('projectCode', 'like', '%' . $request->projectCode . '%');
-                    });
-                }
+                ->when($request->filled('projectCode'),
+                    fn ($x) => $x->whereHas('project',
+                        fn ($p) => $p->where('projectCode', 'like', "%{$request->projectCode}%")
+                    )
+                )
 
-                if ($request->filled('focalPoint')) $q->where('focalPoint', $request->focalPoint);
+                ->when($request->filled('focalPoint'),
+                    fn ($x) => $x->where('focalPoint', $request->focalPoint)
+                )
 
-                if ($request->filled('province')) {
-                    $provinceId = Province::where('name', $request->province)->value('id');
-                    if ($provinceId) $q->where('province_id', $provinceId);
-                }
+                ->when($request->filled('province'),
+                    fn ($x) => $x->whereHas('province',
+                        fn ($p) => $p->where('name', $request->province)
+                    )
+                )
 
-                if ($request->filled('siteCode')) $q->where('siteCode', $request->siteCode);
-                if ($request->filled('healthFacilityName')) $q->where('healthFacilityName', 'like', '%' . $request->healthFacilityName . '%');
-                if ($request->filled('interventionModality')) $q->where('interventionModality', 'like', '%' . $request->interventionModality . '%');
-            });
+                ->when($request->filled('siteCode'),
+                    fn ($x) => $x->where('siteCode', $request->siteCode)
+                )
+
+                ->when($request->filled('healthFacilityName'),
+                    fn ($x) => $x->where('healthFacilityName', 'like', "%{$request->healthFacilityName}%")
+                )
+
+                ->when($request->filled('interventionModality'),
+                    fn ($x) => $x->where('interventionModality', 'like', "%{$request->interventionModality}%")
+                );
+            }
+        ])
+        ->whereHas('program', fn ($q) =>
+            $q->where('database_id', $psychoeducationDatabaseID)
+        );
+
 
         if ($request->filled('indicator')) {
             $indicatorIds = Indicator::where('indicatorRef', 'like', '%' . $request->indicator . '%')->pluck('id');
@@ -415,7 +435,7 @@ class FilterTablesController extends Controller
         $psychoeducations = $psychoeducations->map(function ($p) use ($indicatorRefs) {
             return [
                 'id' => $p->id,
-                'program' => $p->program->focalPoint ?? null,
+                'programName' => $p->program->name ?? null,
                 'indicator' => $indicatorRefs[$p->indicator_id] ?? null,
                 'awarenessDate' => $p->awarenessDate,
                 'awarenessTopic' => $p->awarenessTopic,
@@ -436,7 +456,7 @@ class FilterTablesController extends Controller
         if (!$cdDatabaseID) {
             return response()->json([
                 "status" => false,
-                "message" => "Main database not found",
+                "message" => "Community dialogue database not found",
                 "data" => [],
             ], 404);
         }
@@ -498,7 +518,7 @@ class FilterTablesController extends Controller
 
     public function filterCds(Request $request)
     {
-        $query = CommunityDialogue::with([
+        $query = CommunityDialogue::query()->with([
             'program.project',
             'program.province',
             'indicator'
@@ -572,7 +592,7 @@ class FilterTablesController extends Controller
         if ($request->filled("projectCode"))
             $query->whereHas("project", function ($q) use ($request) {
                 $q->where("projectCode", $request->projectCode);
-            });
+        });
 
         if ($request->filled("indicatorRef"))
                 $query->whereHas("indicator", function ($q) use ($request) {

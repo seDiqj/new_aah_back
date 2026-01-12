@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class KitDistribution extends Model
 {
+
     protected $fillable = [
         "beneficiary_id",
         "kit_id",

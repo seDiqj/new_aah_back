@@ -15,13 +15,19 @@ trait AprToolsTrait
     protected function projectIndicatorsToASpicificDatabase(Project $project, string $databaseId)
     {
 
-        $indicators = $project->outcomes->flatMap(function ($outcome) {
+        $indicators = $project->outcomes->flatMap(function ($outcome) use ($databaseId) {
 
             return $outcome->outputs;
 
-        })->flatMap(function ($output) {
+        })->flatMap(function ($output) use($databaseId) {
 
-            return $output->indicators;
+            if ($databaseId == "*") {
+
+                return $output->indicators;
+
+            }
+
+            return $output->indicators->where("database_id", $databaseId);
             
         });
 
@@ -35,7 +41,7 @@ trait AprToolsTrait
 
             return $outcome->outputs;
 
-        })->flatMap(function ($output) {
+        })->flatMap(function ($output) use($databaseId) {
 
             return $output->indicators->where("database_id", $databaseId);
             

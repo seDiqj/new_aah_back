@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Dessaggregation;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Province;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +37,8 @@ class DessaggregationController extends Controller
         {
             $corespondingIndicator = Indicator::find($dessaggregation["indicatorId"]);
 
-            if (!$corespondingIndicator) return response()->json(["status" => false, "message" => "Invalid indicator referance for dessaggregation " . $dessaggregation["dessaggration"]], 422);
+            if (!$corespondingIndicator)
+                return response()->json(["status" => false, "message" => "Invalid indicator for dessaggregation " . $dessaggregation["dessaggration"]], 422);
 
             $province = Province::where("name", $dessaggregation["province"])->first();
 
@@ -62,27 +62,6 @@ class DessaggregationController extends Controller
                 $exist->update($dessaggregation);
             else
                 Dessaggregation::create($dessaggregation);
-
-            $previusIndicatorDessaggregatoins = $corespondingIndicator->dessaggregations;
-
-            foreach ($previusIndicatorDessaggregatoins as $pd) {
-
-                $exists = false;
-
-                foreach ($dessaggregations as $d) {
-
-                    if (($d["dessaggration"] == $pd["description"]) && ($province->id == $pd["province_id"]))
-                    {
-                        $exists = true;
-                        break;
-                    }
-
-                }
-
-                if (!$exists)
-                    Dessaggregation::find($pd["id"])->delete();
-
-            }
                         
         }
 
@@ -136,60 +115,5 @@ class DessaggregationController extends Controller
             "message" => "Dessaggregations successfully updated!"
         ], 200);
     }
-
-    // public function update(Request $request)
-    // {
-    //     $dessaggregations = $request->input("dessaggregations");
-
-    //     foreach ($dessaggregations as $dessaggregation) 
-    //     {
-    //         $corespondingIndicator = Indicator::where("indicatorRef", $dessaggregation["indicatorRef"])->first();
-
-    //         if (!$corespondingIndicator) {
-    //             return response()->json([
-    //                 "status" => false,
-    //                 "message" => "Invalid indicator reference for dessaggregation " . $dessaggregation["dessaggregation"]
-    //             ], 422);
-    //         }
-
-    //         $province = Province::where("name", $dessaggregation["province"])->first();
-
-    //         if (!$province) {
-    //             return response()->json([
-    //                 "status" => false,
-    //                 "message" => "Invalid province for dessaggregation " . $dessaggregation["dessaggregation"]
-    //             ], 422);
-    //         }
-
-    //         $data = [
-    //             "indicator_id" => $corespondingIndicator->id,
-    //             "province_id" => $province->id,
-    //             "achived_target" => $dessaggregation["achived_target"] ?? 0,
-    //             "target" => $dessaggregation["target"] ?? null, 
-    //         ];
-
-    //         unset($dessaggregation["indicatorRef"]);
-    //         unset($dessaggregation["province"]);
-    //         unset($dessaggregation["achived_target"]);
-    //         unset($dessaggregation["target"]);
-
-    //         $existing = Dessaggregation::where([
-    //             "indicator_id" => $corespondingIndicator->id,
-    //             "province_id" => $province->id,
-    //             "description" => $dessaggregation["dessaggregation"],
-    //         ])->first();
-
-    //         if ($existing) {
-    //             $existing->update($data);
-    //         } else {
-    //             Dessaggregation::create($data);
-    //         }
-    //     }
-
-    //     return response()->json([
-    //         "status" => true,
-    //         "message" => "Dessaggregations successfully updated!"
-    //     ], 200);
-    // }
 
 }

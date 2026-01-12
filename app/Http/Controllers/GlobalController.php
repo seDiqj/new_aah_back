@@ -11,10 +11,13 @@ use App\Models\User;
 use App\Models\Apr;
 use App\Models\Database;
 use App\Models\Beneficiary;
+use App\Traits\AprToolsTrait;
 use Illuminate\Http\Request;
 
 class GlobalController extends Controller
 {
+
+    use AprToolsTrait;
 
     public function indexManagers ()
     {
@@ -49,20 +52,23 @@ class GlobalController extends Controller
         return response()->json(["status" => true, "message" => "", "data" => $programs]);
     }
 
-    public function indexDistricts (Request $request) {
+    // Just for selection
+    public function indexDistricts () {
 
         $districts = District::select("id", "name")->get();
 
         return response()->json(["status" => true, "message" => "", "data" => $districts]);
     }
 
-    public function indexProvinces (Request $request)
+    // Just for selection.
+    public function indexProvinces ()
     {
         $provinces = Province::select("name")->get();
 
         return response()->json(["status" => true, "message" => "", "data" => $provinces]);
     }
 
+    // Just for selection.
     public function indexProjects ()
     {
         $projects = Project::select("id", "projectCode")->get();
@@ -100,6 +106,28 @@ class GlobalController extends Controller
 
     }
 
+    public function indexProjectIndicatorsAccordingToAprogram(string $programId, string $databaseName) {
+
+        $program = Program::find($programId);
+
+        if (!$program) return response()->json(["status" => false, "message" => "No such program in system !", "data" => []], 404);
+
+        $programProject = Project::find($program->project_id);
+
+        if (!$programProject) return response()->json(["status" => false, "message" => "The selected program has no valid project in system !", "data" => []], 404);
+
+        $databaseId = Database::where("name", $databaseName)->pluck("id");
+        
+        if (!$databaseId) return response()->json(["status" => false, "message" => "$databaseName is not a valid database !", "data" => []], 422);
+
+        $indicators = $this->projectIndicatorsToASpicificDatabase($programProject, $databaseId[0]);
+
+        if ($indicators->isEmpty()) return response()->json(["status" => false, "message" => "No indicator was found for selected program, project !", "data" => []], 404);
+
+        return response()->json(["status" => true, "message" => "", "data" => $indicators], 200);
+
+    }
+
     public function changeBeneficiaryAprIncluded (string $id)
     {
         $beneficiary = Beneficiary::find($id);
@@ -111,5 +139,22 @@ class GlobalController extends Controller
         $beneficiary->save();
 
         return response()->json(["status" => true, "message" => "Beneficiary apr included changed !"]);
+    }
+
+
+    public function generateWordsList () {
+
+
+        $wordList = [];
+
+        $lines = file(__DIR__ . '/wordlist.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        foreach ($lines as $line) {
+            $wordList[] = $line;
+        }
+
+        return response()->json(["status" => true, "message" => "", "data" => $wordList]);
+
+
     }
 }

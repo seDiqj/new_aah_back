@@ -15,8 +15,8 @@ class StoreOutputRequest extends FormRequest
     {
         return [
             'outcomeId' => 'required|exists:outcomes,id',
-            'output' => 'required|string|max:255',
-            'outputRef' => 'required|string|max:255',
+            'output' => 'required|string',
+            'outputRef' => 'required|string',
         ];
     }
 

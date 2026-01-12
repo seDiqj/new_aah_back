@@ -3,9 +3,14 @@
 namespace App\Models;
 
 use App\Models\BaseModel;
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Training extends BaseModel
 {    
+
+    use SoftDeletes, CascadeAllDeletes;
+
     protected $fillable = [
         'project_id',
         'province_id',
@@ -18,6 +23,19 @@ class Training extends BaseModel
         'trainingModality',
         'startDate',
         'endDate',
+    ];
+
+
+    protected $cascadeDeletes = [
+        'chapters',
+    ];
+
+    protected $cascadeRelations = [
+        'beneficiaries',
+    ];
+
+    protected $cascadeHasOne = [
+        'evaluations'
     ];
 
     public function project()

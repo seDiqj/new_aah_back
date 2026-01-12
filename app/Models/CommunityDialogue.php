@@ -3,15 +3,29 @@
 namespace App\Models;
 
 use App\Models\BaseModel;
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CommunityDialogue extends BaseModel
 {    
+
+    use SoftDeletes, CascadeAllDeletes;
+
     protected $fillable = [
         "program_id",
         "indicator_id",
-        "remark"
+        "name",
+        "remark",
     ];
 
+    protected $cascadeDeletes = [
+        'groups',
+        'sessions',
+    ];
+
+    protected $cascadeRelations = [
+        'beneficiaries',
+    ];
 
     protected $hidden = [
         "created_at",
@@ -28,10 +42,17 @@ class CommunityDialogue extends BaseModel
         return $this->hasMany(CommunityDialogueSession::class);
     }
 
-    public function beneficiaries ()
+    public function beneficiaries()
     {
-        return $this->belongsToMany(Beneficiary::class);
+        return Beneficiary::query()
+            ->whereHas('communityDialogueSessions', function ($q) {
+                $q->whereIn(
+                    'community_dialogue_session_id',
+                    $this->sessions()->pluck('id')
+                );
+            });
     }
+
 
     public function program ()
     {

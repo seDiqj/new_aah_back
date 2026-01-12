@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\BaseModel;
-
+use App\Traits\CascadeAllDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Enact extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, CascadeAllDeletes;
 
     protected $fillable = [
         'project_id',
@@ -19,6 +20,10 @@ class Enact extends BaseModel
         'type',
         'date',
         'aprIncluded',
+    ];
+
+    protected $cascadeDeletes = [
+        'assessments',
     ];
 
     protected $hidden = [
