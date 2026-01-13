@@ -26,6 +26,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Isp3Controller;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ChatMessageController;
+use App\Http\Controllers\DateBordersController;
 use App\Http\Controllers\KitController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Http\Request;
@@ -410,4 +411,9 @@ Route::prefix("search")->name("search.")->middleware("auth:sanctum")->group(func
 Route::prefix("notification")->name("filter.")->middleware("auth:sanctum")->group(function () {
     Route::get("my_notifications/{id}", [NotificationController::class, "indexUserNotifications"]);
     Route::post("/mark_as_read/{id}", [NotificationController::class, "markNotificationAsRead"]);
+});
+
+Route::prefix("date")->name("date.")->middleware("auth:sanctum")->group(function () {
+    Route::get("/project_date_range/{id}", [DateBordersController::class, "projectDateRange"]);
+    Route::get("/project_date_range_acc_to_program/{id}", [DateBordersController::class, "projectDateRangeAccToProgram"]);
 });

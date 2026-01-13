@@ -31,6 +31,7 @@ class AprGeneratorController extends Controller
      */
     public function generate(string $projectId, string $databaseId, string $provinceId, string $fromDate, string $toDate)
     {
+
         $project = Project::with("outcomes.outputs.indicators.dessaggregations")->find($projectId);
         if (!$project) return response()->json(["status" => false, "message" => "No such project in system!"], 404);
 
@@ -73,7 +74,7 @@ class AprGeneratorController extends Controller
         
                     $achieved = $beneficiaries->filter(fn($b) => $b->indicators->contains('id', $indicator->id))->count();
 
-                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId, $from, $to);
         
                     // if ($subIndicator) {
                     //     $subAchieved = $beneficiaries->reduce(function ($total, $b) use ($indicator) {
@@ -169,7 +170,7 @@ class AprGeneratorController extends Controller
                 $indicator->achived_target = $achieved;
                 $indicator->save();
 
-                $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId, $from, $to);
 
                 $updatedIndicators->push($indicator);
             }
@@ -190,7 +191,7 @@ class AprGeneratorController extends Controller
                 $indicator->save();
                 $updatedIndicators->push($indicator);
 
-                $this->updateDessaggregationsFromPsycho($indicator, $psychoeducations->where("indicator_id", $indicator->id), $provinceId);
+                $this->updateDessaggregationsFromPsycho($indicator, $psychoeducations->where("indicator_id", $indicator->id), $provinceId, $from, $to);
             }
 
         }
@@ -219,7 +220,7 @@ class AprGeneratorController extends Controller
                 $updatedIndicators->push($indicator);
 
                 // NEW: dessaggregation update using trainings collection
-                $this->updateDessaggregationsFromTrainings($indicator, $trainings, $provinceId);
+                $this->updateDessaggregationsFromTrainings($indicator, $trainings, $provinceId, $from, $to);
             }
         }
 
@@ -264,7 +265,7 @@ class AprGeneratorController extends Controller
                 $indicator->save();
                 $updatedIndicators->push($indicator);
 
-                $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId, $from, $to);
 
             }
 
@@ -280,22 +281,34 @@ class AprGeneratorController extends Controller
                 ->with('assessments')
                 ->get();
 
-            $numberOfAssessmentsPerMonth = array_fill(0, 12, 0);
-            $scoresPerMonth = array_fill(0, 12, 0);
-
+            // ✅ NEW: timeline dynamic based on APR date range
+            $numberOfAssessmentsPerMonth = $this->buildMonthlyTimeline($from, $to);
+            $scoresPerMonth = $this->buildMonthlyTimeline($from, $to);
             
             foreach ($projectIndicators as $indicator) {
                 
                 $achieved = 0;
 
-                $enacts->map(function ($enact) use ($indicator, &$numberOfAssessmentsPerMonth, &$scoresPerMonth, &$achieved) {
-                    $achieved += $enact->assessments->reduce(function ($carry, $assessment) use ($indicator, &$numberOfAssessmentsPerMonth, &$scoresPerMonth) {
-                        if ($assessment->enact->indicator_id == $indicator->id && $assessment->enact->aprIncluded)  {
+                $enacts->map(function ($enact) use (
+                    $indicator,
+                    &$numberOfAssessmentsPerMonth,
+                    &$scoresPerMonth,
+                    &$achieved,
+                    $from
+                ) {
+                    $achieved += $enact->assessments->reduce(function ($carry, $assessment) use (
+                        $indicator,
+                        &$numberOfAssessmentsPerMonth,
+                        &$scoresPerMonth,
+                        $from
+                    ) {
+                        if ($assessment->enact->indicator_id == $indicator->id && $assessment->enact->aprIncluded) {
 
-                            $monthIndex = (int) Carbon::parse($assessment->date)->format("n") - 1;
+                            // ✅ NEW: linear month index
+                            $monthIndex = $this->getMonthIndex($from, Carbon::parse($assessment->date));
+                            if ($monthIndex === null) return $carry;
 
                             $numberOfAssessmentsPerMonth[$monthIndex]++;
-
                             $scoresPerMonth[$monthIndex] += $assessment->totalScore;
 
                             return $carry + 1;
@@ -303,6 +316,7 @@ class AprGeneratorController extends Controller
                         return $carry;
                     }, 0);
                 });
+
         
                 $indicator->achived_target = $achieved;
                 $indicator->save();
@@ -347,7 +361,7 @@ class AprGeneratorController extends Controller
 
         }
         
-        // Handles Main databas & Kit database.
+        // Handle's Main databas & Kit database.
         else {
 
             $beneficiaries = Beneficiary::whereHas('programs', function ($query) use ($projectPrograms, $databaseId, $provinceId) {
@@ -381,7 +395,7 @@ class AprGeneratorController extends Controller
                         ->filter(fn($b) => $b->indicators->contains('id', $indicator->id) && $b->aprInclude)
                         ->count();
 
-                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId, $from, $to);
                 
                     $subIndicator = Indicator::where('parent_indicator', $indicator->id)->first();
                 
@@ -397,7 +411,7 @@ class AprGeneratorController extends Controller
                             return $total;
                         }, 0);
 
-                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId);
+                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId, $from, $to);
 
                         $subIndicator->update(['achived_target' => $subAchieved]);
                     }
@@ -424,14 +438,14 @@ class AprGeneratorController extends Controller
                         return $total;
                     }, 0);
                     
-                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId);
+                    $this->updateDessaggregationsFromBeneficiaries($indicator, $beneficiaries, $provinceId, $from, $to);
                     
                     if ($subIndicator) {
                         $beneficiaryCount = $beneficiaries->filter(fn($b) => $b->indicators->contains('id', $indicator->id))->count();
                         $subIndicator->update(['achived_target' => $beneficiaryCount]);
                         $subIndicator->save();
                         
-                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId);
+                        $this->updateDessaggregationsFromBeneficiaries($subIndicator, $beneficiaries, $provinceId, $from, $to);
 
                         $updatedIndicators->push($subIndicator);
                     }
@@ -546,7 +560,7 @@ class AprGeneratorController extends Controller
      * 
      * @helperMethod
      */
-    private function updateDessaggregationsFromBeneficiaries(Indicator $indicator, Collection $beneficiaries, Int $provinceId)
+    private function updateDessaggregationsFromBeneficiaries(Indicator $indicator, Collection $beneficiaries, Int $provinceId, $from, $to)
     {
 
         $dess = $indicator->dessaggregations()->where('province_id', $provinceId)->get();
@@ -569,12 +583,12 @@ class AprGeneratorController extends Controller
 
         $demographicMonthDate = [];
         foreach ($demographics as $key => $val) {
-            $demographicMonthDate[$key] = array_fill(0, 12, 0);
+            $demographicMonthDate[$key] = $this->buildMonthlyTimeline($from, $to);
         }
 
-        $groupMonthDate = array_fill(0, 12, 0);
 
-        $individualMonthDate = array_fill(0, 12, 0);
+        $groupMonthDate = $this->buildMonthlyTimeline($from, $to);
+        $individualMonthDate = $this->buildMonthlyTimeline($from, $to);
 
         foreach ($beneficiaries as $b) {
             if ($indicator->database->name != "refferal_database" && $indicator->database->name != "main_database_meal_tool" && (!$b->indicators->contains('id', $indicator->id))) continue;
@@ -589,7 +603,9 @@ class AprGeneratorController extends Controller
 
             foreach ($sessions as $s) {
                 if (!$s->date) continue;
-                $monthIndex = (int) Carbon::parse($s->date)->format("n") - 1;
+                $monthIndex = $this->getMonthIndex($from, Carbon::parse($s->date));
+                if ($monthIndex === null) continue;
+
 
                 if ($s->group !== null) {
 
@@ -607,7 +623,7 @@ class AprGeneratorController extends Controller
             $gender = strtolower($b->gender ?? '');
             try {
                 $dateOfRegistration = $b->dateOfRegistration ? Carbon::parse($b->dateOfRegistration) : null;
-                $monthIndex = $dateOfRegistration ? ((int) $dateOfRegistration->format("n") - 1) : null;
+                $monthIndex = $dateOfRegistration ? $this->getMonthIndex($from, $dateOfRegistration) : null;
             } catch (\Exception $e) {
                 $monthIndex = null;
             }
@@ -668,7 +684,7 @@ class AprGeneratorController extends Controller
      * 
      * @helperMethod
      */
-    private function updateDessaggregationsFromPsycho(Indicator $indicator, $psychoeducations, $provinceId)
+    private function updateDessaggregationsFromPsycho(Indicator $indicator, $psychoeducations, $provinceId, $from, $to)
     {
         $dess = $indicator->dessaggregations()->where('province_id', $provinceId)->get();
 
@@ -684,13 +700,13 @@ class AprGeneratorController extends Controller
         $demographicMonthDate = [];
 
         foreach ($demographics as $key => $val) {
-            $demographicMonthDate[$key] = array_fill(0, 12, 0);
+            $demographicMonthDate[$key] = $this->buildMonthlyTimeline($from, $to);
         }
 
 
         foreach ($psychoeducations as $psychoeducation) {
 
-            $monthIndex = (int) Carbon::parse($psychoeducation->awarenessDate)->format("n") - 1;
+            $monthIndex = $this->getMonthIndex($from, Carbon::parse($psychoeducation->awarenessDate));
 
 
             $numberOfMenAbove18 = 
@@ -747,7 +763,7 @@ class AprGeneratorController extends Controller
      * 
      * @helperMethod
      */
-    private function updateDessaggregationsFromTrainings(Indicator $indicator, $trainings, $provinceId)
+    private function updateDessaggregationsFromTrainings(Indicator $indicator, $trainings, $provinceId, $from, $to)
     {
         $dess = $indicator->dessaggregations()
             ->where('province_id', $provinceId)
@@ -768,7 +784,7 @@ class AprGeneratorController extends Controller
 
         $demographicMonthDate = [];
         foreach ($demographicTargets as $key => $val) {
-            $demographicMonthDate[$key] = array_fill(0, 12, 0);
+            $demographicMonthDate[$key] = $this->buildMonthlyTimeline($from, $to);
         }
 
         foreach ($trainings as $training) {
@@ -778,7 +794,7 @@ class AprGeneratorController extends Controller
 
                 try {
                     $dateOfRegistration = $b->dateOfRegistration ? Carbon::parse($b->dateOfRegistration) : null;
-                    $monthIndex = $dateOfRegistration ? ((int) $dateOfRegistration->format("n") - 1) : null;
+                    $monthIndex = $dateOfRegistration ? $this->getMonthIndex($from, Carbon::parse($dateOfRegistration)) : null;
                 } catch (\Exception $e) {
                     $monthIndex = null;
                 }
@@ -844,6 +860,31 @@ class AprGeneratorController extends Controller
             }
         }
     }
+
+    /**
+     * Build a linear month timeline between two dates.
+     * Example: Dec-2024 → Sep-2025  => 10 months
+     */
+    protected function buildMonthlyTimeline(Carbon $from, Carbon $to): array
+    {
+        $monthsCount = $from->diffInMonths($to) + 1;
+
+        error_log($monthsCount);
+
+        return array_fill(0, $monthsCount, 0);
+    }
+
+    /**
+     * Calculate month index relative to APR start date.
+     * Example: from=Dec-2024, date=Feb-2025 => index=2
+     */
+    protected function getMonthIndex(Carbon $from, Carbon $date): ?int
+    {
+        if ($date->lt($from)) return null;
+
+        return $from->diffInMonths($date);
+    }
+
 }
 
 

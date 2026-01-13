@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Constants\RequestResponses;
+use App\Constants\System;
 use App\Events\MessageSent;
 use App\Generators\DtoGenerator;
-use App\Helpers\LogHelpers;
 use App\Http\Requests\StoreProjectRequest;
 use App\Models\Apr;
 use App\Models\Beneficiary;
@@ -23,6 +24,7 @@ use App\Models\Referral;
 use App\Models\Sector;
 use App\Models\Training;
 use App\Models\User;
+use App\Services\DatabaseServices\DatabaseService;
 use App\Services\ProjectService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,12 +35,11 @@ class ProjectsController extends Controller
 {
     public function indexProjects(Request $request,DtoGenerator $dtoGenerator, ProjectService $service) 
     {
-
         $dto = $dtoGenerator->generateIndexProjectDto($request);
 
         $projects = $service->getProjects($dto);
 
-        return response()->json(["status" => true, "message" => "", "data" => $projects]);
+        return RequestResponses::success(null, $projects);
     }
 
     // public function indexProjects(Request $request) 
@@ -104,16 +105,13 @@ class ProjectsController extends Controller
     //     return response()->json(["status" => true, "message" => "", "data" => $projects]);
     // }
 
-    public function indexProjectsThatHasAtleastOneIndicatorWhichBelongsToSpicificDatabase(string $databaseName)
+    public function indexProjectsThatHasAtleastOneIndicatorWhichBelongsToSpicificDatabase(string $databaseName, DatabaseService $databaseService)
     {
-        $database = Database::where("name", $databaseName)->first();
+        $database = $databaseService->getDatabaseViaName($databaseName);
 
-        if (!$database) {
-            return response()->json([
-                "status" => false,
-                "message" => "No such database in system with name " . strtoupper($databaseName)
-            ], 404);
-        }
+        if ($database == System::SYSTEM_DATABASE_404) 
+            return RequestResponses::notFound404("No such database in system with name " . strtoupper($databaseName));
+        
 
         $projects = Project::whereHas('outcomes.outputs.indicators', function ($query) use ($database) {
             $query->where('database_id', $database->id);
@@ -484,7 +482,7 @@ class ProjectsController extends Controller
         $project = $project->toArray();
 
         $project["startDate"] = Carbon::parse($project["startDate"])->format("Y-m-d");
-        $project["endDate"] = Carbon::parse($project["startDate"])->format("Y-m-d");
+        $project["endDate"] = Carbon::parse($project["endDate"])->format("Y-m-d");
 
         unset($project["sectors"]);
 

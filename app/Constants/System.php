@@ -16,4 +16,14 @@ class System {
 
     const SYSTEM_404 = "system_404";
 
+    const INVALID_INPUT_STATUS = false;
+
+    const INVALID_INPUT_CODE = 422;
+
+    const SYSTEM_PROJECT_404 = "system_project_404";
+
+    const SYSTEM_PROGRAM_404 = "system_program_404";
+
+    const SYSTEM_DATABASE_404 = "system_database_404";
+
 }
